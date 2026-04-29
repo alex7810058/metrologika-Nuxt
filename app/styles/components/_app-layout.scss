@@ -1,5 +1,5 @@
 .app-layout {
-  // height: 100vh;
+  min-height: 100vh;
   width: 100%;
   position: relative;
 
@@ -79,6 +79,14 @@
 
   &-main {
     width: 100%;
+
+    > .p-card {
+      height: 100%;
+
+      > .p-card-body {
+        padding: 27px;
+      }
+    }
   }
 
   &--sidebar-compact {

@@ -56,3 +56,8 @@ onMounted(() => {
     </template>
   </Card>
 </template>
+
+<script setup lang="ts">
+// Авто-редирект если не залогинен (middleware)
+definePageMeta({ middleware: 'auth' });
+</script>
