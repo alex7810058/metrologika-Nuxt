@@ -22,7 +22,7 @@
       <div class="login-form__footer">
         <div class="more">
           <div class="more-item">
-            <Checkbox inputId="remember" value="Cheese" />
+            <Checkbox inputId="remember" v-model="remember" :binary="true" />
             <label for="remember">Запомнить меня</label>
           </div>
           <div class="more-item">
@@ -40,6 +40,7 @@
 definePageMeta({ layout: 'auth', middleware: 'auth' });
 const email = ref('root')
 const password = ref('root')
+const remember = ref(false)
 const error = ref('')
 const router = useRouter() // Импортируем роутер, если его нет
 
@@ -54,7 +55,7 @@ async function login() {
     // 1. Отправляем запрос на сервер для установки сессии
     await $fetch('/api/login', {
       method: 'POST',
-      body: {email: email.value, password: password.value}
+      body: {email: email.value, password: password.value, remember: remember.value}
     })
 
     // 2. КЛЮЧЕВОЙ МОМЕНТ: принудительно обновляем состояние сессии на клиенте
