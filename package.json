@@ -30,6 +30,8 @@
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
-    "sass": "1.97.3"
+    "sass": "1.97.3",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.2.7"
   }
 }

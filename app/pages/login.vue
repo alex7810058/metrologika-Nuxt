@@ -42,10 +42,13 @@ const email = ref('root')
 const password = ref('root')
 const remember = ref(false)
 const error = ref('')
-const router = useRouter() // Импортируем роутер, если его нет
+const router = useRouter()
 
 // Получаем refreshSession из композабла
 const {fetch: refreshSession} = useUserSession()
+
+// Импортием cache store для загрузки данных после логина
+const cacheStore = useCacheStore()
 
 async function login() {
   // Сбрасываем предыдущую ошибку
@@ -61,8 +64,13 @@ async function login() {
     // 2. КЛЮЧЕВОЙ МОМЕНТ: принудительно обновляем состояние сессии на клиенте
     await refreshSession()
 
-    // 3. Перенаправляем на главную страницу
-    await router.push('/') // или используйте navigateTo('/')
+    // 3. Загружаем все необходимые данные в кэш через Promise.all
+    await Promise.all([
+      $fetch<User[]>('/api/users').then(users => cacheStore.setUsers(users))
+    ])
+
+    // 4. Перенаправляем на главную страницу
+    await router.push('/')
 
   }
   catch (err: any) {

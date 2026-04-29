@@ -33,26 +33,11 @@ definePageMeta({middleware: 'auth'})
 
 import type { User } from '~/types'
 
-const users = ref<User[]>([])
-const loading = ref(false)
+// Используем cache store вместо локального fetch
+const cacheStore = useCacheStore()
+
+// Получаем пользователей из кэша
+const users = computed(() => cacheStore.users)
+const loading = computed(() => !cacheStore.usersLoaded)
 const error = ref<string | null>(null)
-
-async function loadUsers() {
-  loading.value = true
-  error.value = null
-  try {
-    users.value = await $fetch('/api/users')
-  }
-  catch (e) {
-    console.error(e)
-    error.value = 'Не удалось загрузить пользователей'
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  loadUsers()
-})
 </script>
