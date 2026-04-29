@@ -1,53 +1,76 @@
-```
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.class
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
 # Dependencies
 node_modules/
-
-# Build outputs
-dist/
-build/
-.nuxt/
-.output/
-
-# Environment variables
+venv/
+.venv/
 .env
 .env.local
 .env.*
 
-# Logs
+# Logs and temp files
 *.log
-
-# Temporary files
 *.tmp
 *.swp
-
-# IDE specific
-.vscode/
-.idea/
 *.swo
 
-# Python cache (if present)
-__pycache__/
-*.pyc
-*.pyo
+# Editors
+.vscode/
+.idea/
 
-# Coverage reports
+# Coverage
 coverage/
 htmlcov/
+.coverage
+
+# Distribution / packaging
+dist/
+build/
+*.tar.gz
+*.whl
+*.egg
+*.egg-info/
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
+# Python specific
+*.pyc
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+
+# Java/Maven/Gradle
+target/
+.gradle/
+
 # Compressed files
 *.zip
-*.tar.gz
-*.tar.bz2
-*.tar.xz
 *.gz
+*.tar
 *.tgz
 *.bz2
 *.xz
 *.7z
 *.rar
 *.zst
-```
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
