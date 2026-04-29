@@ -1,0 +1,104 @@
+.app-layout {
+  // height: 100vh;
+  width: 100%;
+  position: relative;
+
+  &-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    z-index: 1;
+
+    &-logo-container {
+      display: flex;
+      align-items: center;
+
+      .logo {
+        height: 42px;
+        margin-left: 16px;
+      }
+    }
+
+    &-actions {
+
+    }
+  }
+
+  &-sidebar {
+    position: fixed;
+    top: 84px;
+    left: 28px;
+    bottom: 28px;
+    width: 280px;
+
+    > .p-card {
+      height: 100%;
+      overflow-y: auto;
+
+      .p-card-body {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+    }
+
+    .p-menu {
+      background: none;
+      border: 0;
+
+      &-list {
+        gap: 0;
+        padding: 0;
+      }
+
+      &-item {
+        &-link {
+          padding-top: 12px;
+          padding-bottom: 12px;
+          min-height: 44px;
+        }
+      }
+    }
+  }
+
+  &-main-container {
+    position: absolute;
+    top: 56px;
+    left: 308px;
+    bottom: 0;
+    right: 0;
+    padding: 28px;
+    display: flex;
+  }
+
+  &-main {
+    width: 100%;
+  }
+
+  &--sidebar-compact {
+
+    .app-layout-sidebar {
+      width: 56px;
+
+      .p-menu {
+        min-width: initial;
+      }
+
+      .p-menu-item-link {
+        .ml-2 {
+          display: none !important;
+        }
+      }
+    }
+
+    .app-layout-main-container {
+      left: calc(56px + 28px)
+    }
+  }
+}

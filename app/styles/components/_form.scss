@@ -1,0 +1,8 @@
+
+.form {
+  &-item {
+    & + .form-item {
+      margin-top: 16px;
+    }
+  }
+}

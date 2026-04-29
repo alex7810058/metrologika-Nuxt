@@ -7,11 +7,29 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "generate-report": "npx tsx scripts/generate-report.ts"
   },
   "dependencies": {
+    "@pinia/nuxt": "^0.11.3",
+    "@primeuix/themes": "^2.0.3",
+    "@primevue/themes": "^4.5.4",
+    "bcrypt": "^6.0.0",
     "nuxt": "^4.4.2",
+    "nuxt-auth-utils": "^0.5.29",
+    "pg": "^8.20.0",
+    "pinia": "3.0.4",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "tailwindcss-primeui": "^0.6.1",
     "vue": "^3.5.33",
     "vue-router": "^5.0.6"
+  },
+  "devDependencies": {
+    "@primevue/nuxt-module": "^4.5.5",
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
+    "sass": "1.97.3"
   }
 }
