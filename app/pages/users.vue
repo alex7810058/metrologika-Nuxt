@@ -1,46 +1,16 @@
-<script setup lang="ts">
-import type { User } from '~/types';
-
-// Авто-редирект если не залогинен (middleware)
-definePageMeta({ middleware: 'auth' });
-
-const users = ref<User[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
-
-async function loadUsers() {
-  loading.value = true;
-  error.value = null;
-  try {
-    users.value = await $fetch('/api/users');
-  } catch (e) {
-    console.error(e);
-    error.value = 'Не удалось загрузить пользователей';
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(() => {
-  loadUsers();
-});
-</script>
-
 <template>
   <Card>
-    <template #header>
-      <h2 class="text-xl font-bold">Пользователи</h2>
-    </template>
     <template #content>
+      <h1>Пользователи</h1>
       <div v-if="loading" class="flex justify-center py-8">
-        <ProgressSpinner />
+        <ProgressSpinner/>
       </div>
-      
+
       <Message v-else-if="error" severity="error">{{ error }}</Message>
-      
-      <DataTable 
-        v-else 
-        :value="users" 
+
+      <DataTable
+        v-else
+        :value="users"
         stripedRows
         tableStyle="min-width: 50rem"
       >
@@ -59,5 +29,30 @@ onMounted(() => {
 
 <script setup lang="ts">
 // Авто-редирект если не залогинен (middleware)
-definePageMeta({ middleware: 'auth' });
+definePageMeta({middleware: 'auth'})
+
+import type { User } from '~/types'
+
+const users = ref<User[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+async function loadUsers() {
+  loading.value = true
+  error.value = null
+  try {
+    users.value = await $fetch('/api/users')
+  }
+  catch (e) {
+    console.error(e)
+    error.value = 'Не удалось загрузить пользователей'
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadUsers()
+})
 </script>
