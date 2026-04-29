@@ -17,11 +17,13 @@ venv/
 .env
 .env.local
 .env.*
+project-report.txt
 
 # Build outputs
 dist/
 build/
 target/
+.nuxt
 *.log
 *.tmp
 *.swp
