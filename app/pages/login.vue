@@ -47,8 +47,8 @@ const router = useRouter()
 // Получаем refreshSession из композабла
 const {fetch: refreshSession} = useUserSession()
 
-// Импортием cache store для загрузки данных после логина
-const cacheStore = useCacheStore()
+// Импортием композабл для загрузки данных авторизации
+const { loadAuthData } = useAuthData()
 
 async function login() {
   // Сбрасываем предыдущую ошибку
@@ -64,10 +64,8 @@ async function login() {
     // 2. КЛЮЧЕВОЙ МОМЕНТ: принудительно обновляем состояние сессии на клиенте
     await refreshSession()
 
-    // 3. Загружаем все необходимые данные в кэш через Promise.all
-    await Promise.all([
-      $fetch<User[]>('/api/users').then(users => cacheStore.setUsers(users))
-    ])
+    // 3. Загружаем все необходимые данные через централизованный композабл
+    await loadAuthData()
 
     // 4. Перенаправляем на главную страницу
     await router.push('/')
