@@ -1,0 +1,1492 @@
+📁 СТРУКТУРА ПРОЕКТА:
+==================================================
+
+├── 📁 app
+│   ├── 📁 components
+│   │   ├── 📄 AppLayoutMainContainer.vue
+│   │   ├── 📄 AppLayoutSidebar.vue
+│   │   └── 📄 AppLayoutTopbar.vue
+│   ├── 📁 composables
+│   ├── 📁 layouts
+│   │   ├── 📄 auth.vue
+│   │   └── 📄 default.vue
+│   ├── 📁 middleware
+│   │   └── 📄 auth.ts
+│   ├── 📁 pages
+│   │   ├── 📄 index.vue
+│   │   ├── 📄 login.vue
+│   │   └── 📄 users.vue
+│   ├── 📁 stores
+│   │   └── 📄 app.store.ts
+│   ├── 📁 styles
+│   │   ├── 📁 components
+│   │   │   ├── 📄 _app-layout.scss
+│   │   │   ├── 📄 _auth-layout.scss
+│   │   │   └── 📄 _form.scss
+│   │   ├── 📁 primevue
+│   │   ├── 📄 _base.scss
+│   │   ├── 📄 _fonts.scss
+│   │   └── 📄 app.scss
+│   ├── 📄 app-default.vue
+│   └── 📄 app.vue
+├── 📁 public
+│   ├── 📄 favicon.ico
+│   └── 📄 robots.txt
+├── 📁 server
+│   ├── 📁 api
+│   │   ├── 📁 sse
+│   │   │   └── 📄 status.get.ts
+│   │   ├── 📄 login.post.ts
+│   │   ├── 📄 logout.post.ts
+│   │   ├── 📄 long-task.post.ts
+│   │   ├── 📄 user.post.ts
+│   │   └── 📄 users.get.ts
+│   ├── 📁 plugins
+│   │   └── 📄 migrations.ts
+│   └── 📁 utils
+│       ├── 📄 db.ts
+│       ├── 📄 migrations.ts
+│       └── 📄 taskStore.ts
+├── 📄 .env
+├── 📄 nuxt.config.ts
+├── 📄 package.json
+├── 📄 primevue.theme.ts
+└── 📄 tsconfig.json
+
+==================================================
+📊 Статистика: 16 папок, 35 файлов
+
+📄 СОДЕРЖИМОЕ ФАЙЛОВ:
+==================================================
+
+
+========================================
+ФАЙЛ: app\components\AppLayoutMainContainer.vue
+========================================
+
+<script setup lang="ts">
+</script>
+<template>
+  <div class="app-layout-main-container">
+    <div class="app-layout-main">
+      <slot />
+    </div>
+  </div>
+</template>
+
+
+========================================
+ФАЙЛ: app\components\AppLayoutSidebar.vue
+========================================
+
+<template>
+  <div
+    class="app-layout-sidebar"
+  >
+    <Card>
+      <template #content>
+        <Menu :model="items">
+          <template #item="{ item, props }">
+            <router-link v-slot="{ href, navigate }" :to="item.route" custom>
+              <a :href="href" v-bind="props.action" @click="navigate">
+                <span :class="item.icon"/>
+                <span class="ml-2">{{ item.label }}</span>
+              </a>
+            </router-link>
+          </template>
+        </Menu>
+      </template>
+    </Card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue"
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const items = ref([
+  {
+    label: 'Главная',
+    icon: 'pi pi-palette',
+    route: '/'
+  },
+  {
+    label: 'Пользователи',
+    icon: 'pi pi-users',
+    route: '/users'
+  }
+])
+</script>
+
+
+========================================
+ФАЙЛ: app\components\AppLayoutTopbar.vue
+========================================
+
+<template>
+  <div class="app-layout-topbar">
+    <div class="app-layout-topbar-logo-container">
+      <Button icon="pi pi-bars" aria-label="Меню" severity="secondary" rounded variant="text" size="large" @click="onClickMenuButton"/>
+      <img class="logo" src="~/assets/images/logo_light.png" alt=""/>
+    </div>
+    <div class="app-layout-topbar-actions">
+
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useAppStore} from '~/stores/app.store'
+const { sidebarCompact, setSidebarCompact } = useAppStore()
+
+const onClickMenuButton = () => {
+  console.log(sidebarCompact)
+  setSidebarCompact(!sidebarCompact)
+}
+</script>
+
+
+========================================
+ФАЙЛ: app\layouts\auth.vue
+========================================
+
+<script setup lang="ts">
+</script>
+<template>
+  <slot />
+</template>
+
+
+========================================
+ФАЙЛ: app\layouts\default.vue
+========================================
+
+
+<template>
+  <div
+    class="app-layout"
+    :class="sidebarCompact ? 'app-layout--sidebar-compact' : ''"
+  >
+    <AppLayoutTopbar />
+    <AppLayoutSidebar />
+    <AppLayoutMainContainer>
+      <slot />
+    </AppLayoutMainContainer>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useAppStore} from '~/stores/app.store'
+const { sidebarCompact } = useAppStore()
+
+import AppLayoutTopbar from '~/components/AppLayoutTopbar.vue'
+import AppLayoutSidebar from '~/components/AppLayoutSidebar.vue'
+import AppLayoutMainContainer from '~/components/AppLayoutMainContainer.vue'
+</script>
+
+
+========================================
+ФАЙЛ: app\middleware\auth.ts
+========================================
+
+export default defineNuxtRouteMiddleware(async (to) => {
+  const { loggedIn, fetch } = useUserSession();
+
+  // Ждём загрузки состояния сессии
+  await fetch();
+
+  console.log('Logged in status:', loggedIn.value);
+
+  if (loggedIn.value && to.path === '/login') {
+    return navigateTo('/');
+  }
+
+  if (!loggedIn.value && to.path !== '/login') {
+    return navigateTo('/login');
+  }
+});
+
+
+========================================
+ФАЙЛ: app\pages\index.vue
+========================================
+
+<script setup lang="ts">
+// Авто-редирект если не залогинен (middleware)
+definePageMeta({ middleware: 'auth' });
+
+const { user, loggedIn, clear } = useUserSession();
+const jobId = ref('');
+const taskStatus = ref<'idle' | 'pending' | 'completed' | 'failed'>('idle');
+const resultData = ref<any>(null);
+let eventSource: EventSource | null = null;
+
+async function logout() {
+  await $fetch('/api/logout', { method: 'POST' });
+  await clear();
+  await navigateTo('/login');
+}
+
+async function startLongTask() {
+  const newJobId = crypto.randomUUID();
+  jobId.value = newJobId;
+  taskStatus.value = 'pending';
+
+  // Открываем SSE
+  eventSource = new EventSource(`/api/sse/status?jobId=${newJobId}`);
+  eventSource.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.status === 'completed') {
+      resultData.value = data.data;
+      taskStatus.value = 'completed';
+      eventSource?.close();
+    } else if (data.status === 'failed') {
+      taskStatus.value = 'failed';
+      eventSource?.close();
+    }
+  };
+  eventSource.onerror = () => {
+    taskStatus.value = 'failed';
+    eventSource?.close();
+  };
+
+  try {
+    await $fetch('/api/long-task', { method: 'POST', body: { jobId: newJobId } });
+  } catch (err) {
+    taskStatus.value = 'failed';
+    eventSource?.close();
+  }
+}
+</script>
+
+<template>
+  <Card>
+    <template #content>
+      <h1>Dashboard</h1>
+      <p>Logged in as {{ user?.email }}</p>
+      <Button label="Logout" @click="logout"/>
+      <hr />
+      <button @click="startLongTask" :disabled="taskStatus === 'pending'">
+        {{ taskStatus === 'pending' ? 'Processing...' : 'Start Long Task (5 sec)' }}
+      </button>
+      <div v-if="taskStatus === 'completed'">
+        <h3>Result (1000 records):</h3>
+        <pre>{{ JSON.stringify(resultData, null, 2) }}</pre>
+      </div>
+      <p v-else-if="taskStatus === 'failed'">Task failed</p>
+    </template>
+  </Card>
+</template>
+
+
+========================================
+ФАЙЛ: app\pages\login.vue
+========================================
+
+<template>
+  <div class="auth-layout">
+    <img class="bg" src="~/assets/images/bg.jpg" alt="" />
+    <form class="login-form" @submit.prevent="login" autocomplete="off">
+      <div class="login-form__header">
+        <img src="~/assets/images/logo_light.png" alt=""/>
+      </div>
+      <div class="login-form__body">
+        <div class="form-item">
+          <FloatLabel variant="on">
+            <InputText id="email" v-model="email" autocomplete="off"/>
+            <label for="email">Email</label>
+          </FloatLabel>
+        </div>
+        <div class="form-item">
+          <FloatLabel variant="on">
+            <InputText id="password" v-model="password" autocomplete="off" style="-webkit-text-security: disc"/>
+            <label for="password">Пароль</label>
+          </FloatLabel>
+        </div>
+      </div>
+      <div class="login-form__footer">
+        <div class="more">
+          <div class="more-item">
+            <Checkbox inputId="remember" value="Cheese" />
+            <label for="remember">Запомнить меня</label>
+          </div>
+          <div class="more-item">
+            <a class="link">Забыли пароль?</a>
+          </div>
+        </div>
+        <Button label="Войти" type="submit"/>
+      </div>
+    </form>
+
+  </div>
+</template>
+
+<script setup lang="ts">
+definePageMeta({ layout: 'auth', middleware: 'auth' });
+const email = ref('root')
+const password = ref('root')
+const error = ref('')
+const router = useRouter() // Импортируем роутер, если его нет
+
+// Получаем refreshSession из композабла
+const {fetch: refreshSession} = useUserSession()
+
+async function login() {
+  // Сбрасываем предыдущую ошибку
+  error.value = ''
+
+  try {
+    // 1. Отправляем запрос на сервер для установки сессии
+    await $fetch('/api/login', {
+      method: 'POST',
+      body: {email: email.value, password: password.value}
+    })
+
+    // 2. КЛЮЧЕВОЙ МОМЕНТ: принудительно обновляем состояние сессии на клиенте
+    await refreshSession()
+
+    // 3. Перенаправляем на главную страницу
+    await router.push('/') // или используйте navigateTo('/')
+
+  }
+  catch (err: any) {
+    // Обработка ошибки входа
+    error.value = err.data?.message || 'Invalid login credentials'
+  }
+}
+</script>
+
+
+========================================
+ФАЙЛ: app\pages\users.vue
+========================================
+
+<script setup lang="ts">
+// Авто-редирект если не залогинен (middleware)
+definePageMeta({ middleware: 'auth' });
+</script>
+
+<template>
+  <Card>
+    <template #content>
+      users
+    </template>
+  </Card>
+</template>
+
+
+========================================
+ФАЙЛ: app\stores\app.store.ts
+========================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+
+export const useAppStore = defineStore('app', () => {
+  const sidebarCompact = ref<boolean>(true)
+
+  const setSidebarCompact = (_value: boolean) => sidebarCompact.value = _value
+
+  return {
+    sidebarCompact,
+
+    setSidebarCompact
+  }
+})
+
+
+========================================
+ФАЙЛ: app\styles\components\_app-layout.scss
+========================================
+
+.app-layout {
+  // height: 100vh;
+  width: 100%;
+  position: relative;
+
+  &-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    z-index: 1;
+
+    &-logo-container {
+      display: flex;
+      align-items: center;
+
+      .logo {
+        height: 42px;
+        margin-left: 16px;
+      }
+    }
+
+    &-actions {
+
+    }
+  }
+
+  &-sidebar {
+    position: fixed;
+    top: 84px;
+    left: 28px;
+    bottom: 28px;
+    width: 280px;
+
+    > .p-card {
+      height: 100%;
+      overflow-y: auto;
+
+      .p-card-body {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+    }
+
+    .p-menu {
+      background: none;
+      border: 0;
+
+      &-list {
+        gap: 0;
+        padding: 0;
+      }
+
+      &-item {
+        &-link {
+          padding-top: 12px;
+          padding-bottom: 12px;
+        }
+      }
+    }
+  }
+
+  &-main-container {
+    position: absolute;
+    top: 56px;
+    left: 308px;
+    bottom: 0;
+    right: 0;
+    padding: 28px;
+    display: flex;
+  }
+
+  &-main {
+    width: 100%;
+  }
+
+  &--sidebar-compact {
+    .app-layout-sidebar {
+      width: 56px;
+
+      .p-menu {
+        min-width: initial;
+      }
+
+      .p-menu-item-link {
+        .ml-2 {
+          display: none !important;
+        }
+      }
+    }
+  }
+}
+
+
+========================================
+ФАЙЛ: app\styles\components\_auth-layout.scss
+========================================
+
+
+.auth-layout {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  position: relative;
+  overflow: hidden;
+
+  .bg {
+    display: block;
+    object-position: left top;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+    transform: scale(1.2);
+  }
+
+  .login-form {
+    position: relative;
+    z-index: 1;
+    background: #fff;
+    padding: 32px;
+    border-radius: 10px;
+    box-shadow: 0 10px 10px -9px rgba(0,0,0,.1);
+
+    &__header, &__footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    &__body {
+      margin: 35px 0 16px 0;
+    }
+
+    &__footer {
+
+      .more {
+        margin-bottom: 16px;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      button {
+        width: 120px;
+      }
+    }
+  }
+}
+
+
+========================================
+ФАЙЛ: app\styles\components\_form.scss
+========================================
+
+
+.form {
+  &-item {
+    & + .form-item {
+      margin-top: 16px;
+    }
+  }
+}
+
+
+========================================
+ФАЙЛ: app\styles\_base.scss
+========================================
+
+:root {
+  --p-button-label-font-weight: 500;
+  --p-floatlabel-font-weight: 400;
+  --p-inputtext-color: #000;
+  --p-card-shadow: 0 10px 10px -9px rgba(0,0,0,.1);
+  --p-border-radius-xl: 8px;
+  --p-menu-item-color: #000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-height: 100vh !important;
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
+  background: #f5f5f5;
+}
+
+body, button, input, select {
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+h1, h2, h3, h4, h5 {
+  display: block;
+  margin-top: 0;
+}
+
+img {
+  display: block !important;
+}
+
+input {
+  min-width: 100%;
+}
+
+.p-checkbox {
+  .p-checkbox-box {
+    transition: none !important;
+  }
+
+  & + label {
+    margin-left: 8px;
+  }
+}
+
+.p-menu-item-link {
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+  .pi {
+    margin-right: 10px;
+  }
+}
+
+a.link {
+  color: var(--p-primary-500);
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--p-primary-600);
+  }
+}
+
+
+========================================
+ФАЙЛ: app\styles\_fonts.scss
+========================================
+
+/* inter-300 - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-300.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-300italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 300;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-300italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-regular - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 400;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-500 - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-500italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 500;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-500italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-600 - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-600italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 600;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-600italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-700 - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-700.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-700italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 700;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-700italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-800 - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-800.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-800italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 800;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-800italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-900 - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 900;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-900.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* inter-900italic - cyrillic_latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 900;
+  src: url('../assets/fonts/inter-v20-cyrillic_latin-900italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+
+///* manrope-300 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'Manrope';
+//  font-style: normal;
+//  font-weight: 300;
+//  src: url('../assets/fonts/manrope-v15-cyrillic_latin-300.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* manrope-regular - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'Manrope';
+//  font-style: normal;
+//  font-weight: 400;
+//  src: url('../assets/fonts/manrope-v15-cyrillic_latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* manrope-500 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'Manrope';
+//  font-style: normal;
+//  font-weight: 500;
+//  src: url('../assets/fonts/manrope-v15-cyrillic_latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* manrope-600 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'Manrope';
+//  font-style: normal;
+//  font-weight: 600;
+//  src: url('../assets/fonts/manrope-v15-cyrillic_latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* manrope-700 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'Manrope';
+//  font-style: normal;
+//  font-weight: 700;
+//  src: url('../assets/fonts/manrope-v15-cyrillic_latin-700.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* manrope-800 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'Manrope';
+//  font-style: normal;
+//  font-weight: 800;
+//  src: url('../assets/fonts/manrope-v15-cyrillic_latin-800.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+
+
+
+///* ibm-plex-sans-300 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: normal;
+//  font-weight: 300;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-300.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-300italic - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: italic;
+//  font-weight: 300;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-300italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-regular - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: normal;
+//  font-weight: 400;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-italic - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: italic;
+//  font-weight: 400;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-500 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: normal;
+//  font-weight: 500;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-500.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-500italic - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: italic;
+//  font-weight: 500;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-500italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-600 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: normal;
+//  font-weight: 600;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-600.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-600italic - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: italic;
+//  font-weight: 600;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-600italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-700 - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: normal;
+//  font-weight: 700;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-700.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+///* ibm-plex-sans-700italic - cyrillic_latin */
+//@font-face {
+//  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+//  font-family: 'IBM Plex Sans';
+//  font-style: italic;
+//  font-weight: 700;
+//  src: url('../assets/fonts/ibm-plex-sans-v23-cyrillic_latin-700italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+//}
+
+
+
+
+
+
+========================================
+ФАЙЛ: app\styles\app.scss
+========================================
+
+@use 'primeicons/primeicons.css' as *;
+
+@use "fonts" as *;
+@use "base" as *;
+
+@use "components/app-layout" as *;
+@use "components/auth-layout" as *;
+@use "components/form" as *;
+@use "components/form" as *;
+
+
+
+
+========================================
+ФАЙЛ: app\app-default.vue
+========================================
+
+<template>
+  <div>
+    <NuxtRouteAnnouncer />
+    <NuxtWelcome />
+  </div>
+</template>
+
+
+========================================
+ФАЙЛ: app\app.vue
+========================================
+
+<script setup lang="ts">
+</script>
+<template>
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
+</template>
+
+
+========================================
+ФАЙЛ: public\favicon.ico
+========================================
+
+[Бинарный файл: 4286 байт]
+
+========================================
+ФАЙЛ: public\robots.txt
+========================================
+
+User-Agent: *
+Disallow:
+
+
+========================================
+ФАЙЛ: server\api\sse\status.get.ts
+========================================
+
+import { getTaskResult, taskEmitter } from '../../utils/taskStore';
+
+export default defineEventHandler(async (event) => {
+  // Защита: только авторизованные
+  const session = await requireUserSession(event);
+
+  const query = getQuery(event);
+  const jobId = query.jobId as string;
+  if (!jobId) throw createError({ statusCode: 400, message: 'jobId required' });
+
+  const res = event.node.res;
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  const send = (data: any) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Уже готовый результат?
+  const existing = getTaskResult(jobId);
+  if (existing) {
+    send(existing);
+    res.end();
+    return;
+  }
+
+  // Ожидаем события
+  const handler = (taskResult: any) => {
+    send(taskResult);
+    res.end();
+    taskEmitter.off(`task:${jobId}`, handler);
+  };
+  taskEmitter.on(`task:${jobId}`, handler);
+
+  event.node.req.on('close', () => {
+    taskEmitter.off(`task:${jobId}`, handler);
+    if (!res.writableEnded) res.end();
+  });
+
+  // Предотвращаем автоматическое закрытие Nitro
+  return new Promise(() => {});
+});
+
+
+========================================
+ФАЙЛ: server\api\login.post.ts
+========================================
+
+import { query } from '../utils/db'
+import bcrypt from 'bcrypt'
+
+export default defineEventHandler(async (event) => {
+  const body = await readBody(event)
+  const {email, password} = body
+
+  // Ищем пользователя в БД
+  const result = await query('SELECT * FROM users WHERE email = $1', [email])
+  const user = result.rows[0]
+
+  if (!user) {
+    return {error: true, message: 'Invalid credentials'}
+  }
+
+  // Проверка пароля (предполагаем, что хранится хеш)
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) {
+    return {error: true, message: 'Invalid credentials'}
+  }
+
+  // Устанавливаем сессию
+  await setUserSession(event, {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name
+    },
+    loggedInAt: Date.now()
+  })
+
+  return {success: true}
+})
+
+
+========================================
+ФАЙЛ: server\api\logout.post.ts
+========================================
+
+export default defineEventHandler(async (event) => {
+  await clearUserSession(event);
+  return { success: true };
+});
+
+
+========================================
+ФАЙЛ: server\api\long-task.post.ts
+========================================
+
+import { setTaskResult } from '../utils/taskStore';
+
+function generateRandomData() {
+  const records = [];
+  for (let i = 0; i < 1000; i++) {
+    records.push({
+      id: i + 1,
+      value: Math.random() * 100,
+      text: `Record ${i + 1}`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+  return records;
+}
+
+export default defineEventHandler(async (event) => {
+  // Защита: только для авторизованных
+  const session = await requireUserSession(event);
+
+  const body = await readBody(event);
+  const { jobId } = body;
+  if (!jobId) throw createError({ statusCode: 400, message: 'jobId required' });
+
+  // Запускаем фоновую задачу
+  setTimeout(async () => {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    const result = generateRandomData();
+    setTaskResult(jobId, result);
+  }, 0);
+
+  return { status: 'accepted', jobId, message: 'Task accepted' };
+});
+
+
+========================================
+ФАЙЛ: server\api\user.post.ts
+========================================
+
+// server/api/users.post.ts
+import { query } from '../utils/db'
+import bcrypt from 'bcrypt'
+
+export default defineEventHandler(async (event) => {
+  // Только для админов (если нужно) – можно убрать или оставить
+  await requireUserSession(event)
+
+  const body = await readBody(event)
+  const {email, name, password} = body // теперь получаем обычный пароль
+
+  if (!email || !name || !password) {
+    setResponseStatus(event, 400)
+    return {error: true, message: 'Missing fields: email, name, password'}
+  }
+
+  // Хэшируем пароль на сервере
+  const saltRounds = 10
+  const password_hash = await bcrypt.hash(password, saltRounds)
+
+  try {
+    const result = await query(
+      'INSERT INTO users (email, name, password) VALUES ($1, $2, $3) RETURNING id, email, name',
+      [email, name, password_hash]
+    )
+    return result.rows[0]
+  }
+  catch (error: any) {
+    if (error.code === '23505') { // нарушение уникальности email
+      setResponseStatus(event, 409)
+      return {error: true, message: 'User with this email already exists'}
+    }
+    console.error(error)
+    setResponseStatus(event, 500)
+    return {error: true, message: 'Internal server error'}
+  }
+})
+
+
+========================================
+ФАЙЛ: server\api\users.get.ts
+========================================
+
+// server/api/users.get.ts
+import { query } from '../utils/db'
+
+export default defineEventHandler(async (event) => {
+  // Защита: только авторизованные пользователи
+  await requireUserSession(event)
+
+  try {
+    const result = await query('SELECT id, email, name, created_at FROM users ORDER BY id')
+    return result.rows
+  }
+  catch (error) {
+    console.error(error)
+    throw createError({statusCode: 500, message: 'Database error'})
+  }
+})
+
+
+========================================
+ФАЙЛ: server\plugins\migrations.ts
+========================================
+
+import { runMigrations } from '../utils/migrations';
+
+export default defineNitroPlugin(async (nitroApp) => {
+  console.log('📦 Running database migrations...');
+  await runMigrations();
+});
+
+
+========================================
+ФАЙЛ: server\utils\db.ts
+========================================
+
+import { Pool, types } from 'pg';
+
+// Парсим BIGINT (int8) как число (ОСТОРОЖНО: может потерять точность при ID > 2^53)
+types.setTypeParser(types.builtins.INT8, (val: string) => parseInt(val, 10));
+
+// Парсим NUMERIC и FLOAT8 как float
+types.setTypeParser(types.builtins.NUMERIC, (val: string) => parseFloat(val));
+types.setTypeParser(types.builtins.FLOAT8, (val: string) => parseFloat(val));
+
+// INT4, INT2 и так по умолчанию числа, но для единообразия:
+types.setTypeParser(types.builtins.INT4, (val: string) => parseInt(val, 10));
+types.setTypeParser(types.builtins.INT2, (val: string) => parseInt(val, 10));
+
+console.log('DB parsers set: INT8 -> number');
+
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT || '5432'),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  max: 20,
+  idleTimeoutMillis: 30000,
+});
+
+pool.on('connect', () => {
+  console.log('✅ Connected to PostgreSQL');
+});
+
+pool.on('error', (err) => {
+  console.error('❌ Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+export const query = (text: string, params?: any[]) => pool.query(text, params);
+export const closeDb = () => pool.end();
+
+
+========================================
+ФАЙЛ: server\utils\migrations.ts
+========================================
+
+import { query } from './db';
+import bcrypt from 'bcrypt';
+
+const migrations = [
+  `create table if not exists users (
+                                        id bigserial primary key,
+                                        name text not null,
+                                        email text not null unique,
+                                        email_verified_at timestamptz null,
+                                        password text not null,
+                                        remember_token text null,
+                                        created_at timestamptz not null default now(),
+                                        updated_at timestamptz not null default now(),
+                                        active boolean not null default true,
+                                        role text not null default 'user'
+   )`,
+
+  `create table if not exists personal_access_tokens (
+                                                         id bigserial primary key,
+                                                         tokenable_type text not null,
+                                                         tokenable_id bigint not null references users(id) on delete cascade,
+                                                         name text not null default 'api',
+                                                         token varchar(64) not null unique,
+                                                         abilities text null,
+                                                         last_used_at timestamptz null,
+                                                         expires_at timestamptz null,
+                                                         created_at timestamptz not null default now(),
+                                                         updated_at timestamptz not null default now()
+   )`,
+
+  `create index if not exists idx_personal_access_tokens_tokenable on personal_access_tokens (tokenable_type, tokenable_id)`,
+  `create index if not exists idx_personal_access_tokens_expires_at on personal_access_tokens (expires_at)`,
+
+  `create table if not exists sis (
+                                      id bigserial primary key,
+                                      org_title text not null default '',
+                                      mit_number text not null default '',
+                                      mit_title text not null,
+                                      mi_number text not null default '',
+                                      mit_notation text not null default '',
+                                      mi_modification text not null default '',
+                                      verification_date timestamptz null,
+                                      valid_date timestamptz null,
+                                      result_docnum text not null default '',
+                                      applicability boolean not null default false,
+                                      created_at timestamptz not null default now(),
+                                      updated_at timestamptz not null default now(),
+                                      comment text not null default '',
+                                      sync_date timestamptz null,
+                                      status bigint not null default 0,
+                                      user_id bigint not null default 0
+   )`,
+
+  `create index if not exists idx_sis_status on sis (status)`,
+];
+
+export async function runMigrations() {
+  // 1. Выполняем все SQL-миграции
+  for (const sql of migrations) {
+    try {
+      await query(sql);
+      console.log(`✅ Migration executed: ${sql.substring(0, 60)}...`);
+    } catch (err: any) {
+      console.error(`❌ Migration failed: ${sql}`);
+      console.error(err.message);
+      throw err;
+    }
+  }
+
+  // 2. Создаём дефолтного суперадмина, если его нет
+  const existingAdmin = await query(`SELECT id FROM users WHERE email = $1`, ['root']);
+  if (existingAdmin.rows.length === 0) {
+    const hashedPassword = await bcrypt.hash('root', 10);
+    await query(
+      `INSERT INTO users (name, email, password, role, active, email_verified_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      ['Super Admin', 'root', hashedPassword, 'superadmin', true, new Date()]
+    );
+    console.log('✅ Default superadmin user created (email: root, password: root)');
+  } else {
+    console.log('ℹ️ Superadmin already exists, skipping creation');
+  }
+
+  console.log('🎉 All migrations completed successfully');
+}
+
+
+========================================
+ФАЙЛ: server\utils\taskStore.ts
+========================================
+
+import EventEmitter from 'node:events';
+
+export interface TaskResult {
+  jobId: string;
+  status: 'pending' | 'completed' | 'failed';
+  data?: any;
+  error?: string;
+}
+
+const tasks = new Map<string, TaskResult>();
+export const taskEmitter = new EventEmitter();
+
+export function setTaskResult(jobId: string, data?: any, error?: string) {
+  const task: TaskResult = {
+    jobId,
+    status: error ? 'failed' : 'completed',
+    data,
+    error,
+  };
+  tasks.set(jobId, task);
+  taskEmitter.emit(`task:${jobId}`, task);
+}
+
+export function getTaskResult(jobId: string): TaskResult | undefined {
+  return tasks.get(jobId);
+}
+
+
+========================================
+ФАЙЛ: .env
+========================================
+
+[Бинарный файл: 145 байт]
+
+========================================
+ФАЙЛ: nuxt.config.ts
+========================================
+
+import { Theme } from './primevue.theme';
+
+export default defineNuxtConfig({
+  compatibilityDate: '2025-07-15',
+  devtools: { enabled: true },
+  modules: [
+    '@primevue/nuxt-module',
+    'nuxt-auth-utils',
+    '@pinia/nuxt'
+  ],
+  ssr: false,
+  css: ['~/styles/app.scss'],
+  primevue: {
+    options: {
+      theme: {
+        preset: Theme, // Используем наш пресет
+        options: {
+          darkModeSelector: '.my-app-dark'
+        }
+      }
+    }
+  },
+})
+
+
+========================================
+ФАЙЛ: package.json
+========================================
+
+{
+  "name": "metrologika",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "generate-report": "npx tsx scripts/generate-report.ts"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^0.11.3",
+    "@primeuix/themes": "^2.0.3",
+    "@primevue/themes": "^4.5.4",
+    "bcrypt": "^6.0.0",
+    "nuxt": "^4.4.2",
+    "nuxt-auth-utils": "^0.5.29",
+    "pg": "^8.20.0",
+    "pinia": "3.0.4",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "tailwindcss-primeui": "^0.6.1",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6"
+  },
+  "devDependencies": {
+    "@primevue/nuxt-module": "^4.5.5",
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
+    "sass": "1.97.3"
+  }
+}
+
+
+========================================
+ФАЙЛ: primevue.theme.ts
+========================================
+
+// themes/myTheme.ts
+import { definePreset } from '@primeuix/themes'
+import Aura from '@primeuix/themes/aura'
+
+export const Theme = definePreset(Aura, {
+  semantic: {
+    primary: {
+      50: '#e6f0f7',  // самый светлый
+      100: '#cce1ef',
+      200: '#99c3df',
+      300: '#66a5cf',
+      400: '#3387bf',
+      500: '#1c5c99',  // ваш базовый цвет
+      600: '#164a7a',
+      700: '#11375c',
+      800: '#0b253d',
+      900: '#06121f',
+      950: '#03090e'   // самый тёмный
+    }
+  },
+  components: {
+    button: {
+      root: {
+        primary: {
+          background: '{primary.500}',
+          hoverBackground: '{primary.600}',
+          activeBackground: '{primary.700}',
+          borderColor: '{primary.500}',
+          hoverBorderColor: '{primary.600}',
+          activeBorderColor: '{primary.700}',
+          color: '#ffffff',
+          hoverColor: '#ffffff',
+          activeColor: '#ffffff'
+        }
+      }
+    }
+  }
+})
+
+
+========================================
+ФАЙЛ: tsconfig.json
+========================================
+
+{
+  // https://nuxt.com/docs/guide/concepts/typescript
+  "files": [],
+  "references": [
+    {
+      "path": "./.nuxt/tsconfig.app.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.server.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.shared.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.node.json"
+    }
+  ]
+}
+
+
+==================================================
+Отчет сгенерирован: 29.04.2026, 07:56:58
+Время генерации: 0.02 сек.
