@@ -1,6 +1,6 @@
-import { runMigrations } from '../utils/migrations';
+import { runMigrations } from '../utils/migrations'
 
 export default defineNitroPlugin(async (nitroApp) => {
-  console.log('📦 Running database migrations...');
-  await runMigrations();
-});
+  console.log('📦 Running database migrations...')
+  await runMigrations()
+})
