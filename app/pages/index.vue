@@ -3,6 +3,7 @@
 definePageMeta({ middleware: 'auth' })
 
 const { user, loggedIn, clear } = useUserSession()
+const cacheStore = useCacheStore()
 const jobId = ref('')
 const taskStatus = ref<'idle' | 'pending' | 'completed' | 'failed'>('idle')
 const resultData = ref<any>(null)
@@ -11,6 +12,8 @@ let eventSource: EventSource | null = null
 async function logout() {
   await $fetch('/api/logout', { method: 'POST' })
   await clear()
+  // Очищаем кэш при логауте
+  cacheStore.clearCache()
   await navigateTo('/login')
 }
 
