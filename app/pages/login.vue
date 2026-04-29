@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: 'auth', middleware: 'auth' });
+definePageMeta({ layout: 'auth', middleware: 'auth' })
 const email = ref('root')
 const password = ref('root')
 const remember = ref(false)

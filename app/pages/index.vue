@@ -1,47 +1,47 @@
 <script setup lang="ts">
 // Авто-редирект если не залогинен (middleware)
-definePageMeta({ middleware: 'auth' });
+definePageMeta({ middleware: 'auth' })
 
-const { user, loggedIn, clear } = useUserSession();
-const jobId = ref('');
-const taskStatus = ref<'idle' | 'pending' | 'completed' | 'failed'>('idle');
-const resultData = ref<any>(null);
-let eventSource: EventSource | null = null;
+const { user, loggedIn, clear } = useUserSession()
+const jobId = ref('')
+const taskStatus = ref<'idle' | 'pending' | 'completed' | 'failed'>('idle')
+const resultData = ref<any>(null)
+let eventSource: EventSource | null = null
 
 async function logout() {
-  await $fetch('/api/logout', { method: 'POST' });
-  await clear();
-  await navigateTo('/login');
+  await $fetch('/api/logout', { method: 'POST' })
+  await clear()
+  await navigateTo('/login')
 }
 
 async function startLongTask() {
-  const newJobId = crypto.randomUUID();
-  jobId.value = newJobId;
-  taskStatus.value = 'pending';
+  const newJobId = crypto.randomUUID()
+  jobId.value = newJobId
+  taskStatus.value = 'pending'
 
   // Открываем SSE
-  eventSource = new EventSource(`/api/sse/status?jobId=${newJobId}`);
+  eventSource = new EventSource(`/api/sse/status?jobId=${newJobId}`)
   eventSource.onmessage = (e) => {
-    const data = JSON.parse(e.data);
+    const data = JSON.parse(e.data)
     if (data.status === 'completed') {
-      resultData.value = data.data;
-      taskStatus.value = 'completed';
-      eventSource?.close();
+      resultData.value = data.data
+      taskStatus.value = 'completed'
+      eventSource?.close()
     } else if (data.status === 'failed') {
-      taskStatus.value = 'failed';
-      eventSource?.close();
+      taskStatus.value = 'failed'
+      eventSource?.close()
     }
-  };
+  }
   eventSource.onerror = () => {
-    taskStatus.value = 'failed';
-    eventSource?.close();
-  };
+    taskStatus.value = 'failed'
+    eventSource?.close()
+  }
 
   try {
-    await $fetch('/api/long-task', { method: 'POST', body: { jobId: newJobId } });
+    await $fetch('/api/long-task', { method: 'POST', body: { jobId: newJobId } })
   } catch (err) {
-    taskStatus.value = 'failed';
-    eventSource?.close();
+    taskStatus.value = 'failed'
+    eventSource?.close()
   }
 }
 </script>

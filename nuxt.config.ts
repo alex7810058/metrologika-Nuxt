@@ -1,4 +1,4 @@
-import { Theme } from './primevue.theme';
+import { Theme } from './primevue.theme'
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',

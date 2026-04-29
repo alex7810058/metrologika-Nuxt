@@ -1,5 +1,5 @@
-import { query } from './db';
-import bcrypt from 'bcrypt';
+import { query } from './db'
+import bcrypt from 'bcrypt'
 
 const migrations = [
   `create table if not exists users (
@@ -52,34 +52,34 @@ const migrations = [
    )`,
 
   `create index if not exists idx_sis_status on sis (status)`,
-];
+]
 
 export async function runMigrations() {
   // 1. Выполняем все SQL-миграции
   for (const sql of migrations) {
     try {
-      await query(sql);
-      console.log(`✅ Migration executed: ${sql.substring(0, 60)}...`);
+      await query(sql)
+      console.log(`✅ Migration executed: ${sql.substring(0, 60)}...`)
     } catch (err: any) {
-      console.error(`❌ Migration failed: ${sql}`);
-      console.error(err.message);
-      throw err;
+      console.error(`❌ Migration failed: ${sql}`)
+      console.error(err.message)
+      throw err
     }
   }
 
   // 2. Создаём дефолтного суперадмина, если его нет
-  const existingAdmin = await query(`SELECT id FROM users WHERE email = $1`, ['root']);
+  const existingAdmin = await query(`SELECT id FROM users WHERE email = $1`, ['root'])
   if (existingAdmin.rows.length === 0) {
-    const hashedPassword = await bcrypt.hash('root', 10);
+    const hashedPassword = await bcrypt.hash('root', 10)
     await query(
       `INSERT INTO users (name, email, password, role, active, email_verified_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       ['Super Admin', 'root', hashedPassword, 'superadmin', true, new Date()]
-    );
-    console.log('✅ Default superadmin user created (email: root, password: root)');
+    )
+    console.log('✅ Default superadmin user created (email: root, password: root)')
   } else {
-    console.log('ℹ️ Superadmin already exists, skipping creation');
+    console.log('ℹ️ Superadmin already exists, skipping creation')
   }
 
-  console.log('🎉 All migrations completed successfully');
+  console.log('🎉 All migrations completed successfully')
 }
