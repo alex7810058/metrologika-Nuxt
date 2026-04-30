@@ -29,10 +29,18 @@
           <label for="email">Email</label>
         </FloatLabel>
       </div>
+      <template v-if="appStore.userDialog.method === 'create'">
+        <div class="form-item">
+          <FloatLabel variant="on">
+            <InputText id="password" v-model="appStore.userDialog.data.password" autocomplete="off" />
+            <label for="password">Пароль</label>
+          </FloatLabel>
+        </div>
+      </template>
       <div class="form-item">
         <FloatLabel variant="on">
-          <InputText id="password" v-model="appStore.userDialog.data.name" autocomplete="off" />
-          <label for="password">Имя</label>
+          <InputText id="name" v-model="appStore.userDialog.data.name" autocomplete="off" />
+          <label for="name">Имя</label>
         </FloatLabel>
       </div>
       <div class="form-item">
@@ -61,8 +69,25 @@
 const appStore = useAppStore()
 const cacheStore = useCacheStore()
 const userForm = ref<HTMLFormElement | null>(null)
+const isLoading = ref(false)
 
-const submit = () => {
-  console.log(1111)
+const submit = async () => {
+  // блокируем повторные вызовы
+  if (isLoading.value) return
+  isLoading.value = true
+  try {
+    const result = await $fetch('/api/users/create', {
+      method: 'POST',
+      body: {
+        email: appStore.userDialog.data.email,
+        password: appStore.userDialog.data.password,
+        name: appStore.userDialog.data.name
+      }
+    })
+    console.log(result)
+  }
+  finally {
+    isLoading.value = false
+  }
 }
 </script>
