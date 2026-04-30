@@ -1,12 +1,12 @@
 // server/api/users.get.ts
-import { query } from '../utils/db'
+import { query } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
   // Защита: только авторизованные пользователи
   await requireUserSession(event)
 
   try {
-    const result = await query('SELECT id, email, name, created_at FROM users ORDER BY id')
+    const result = await query('SELECT * FROM roles ORDER BY id')
     return result.rows
   }
   catch (error) {

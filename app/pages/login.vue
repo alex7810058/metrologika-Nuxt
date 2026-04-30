@@ -1,20 +1,39 @@
 <template>
   <div class="auth-layout">
     <img class="bg" src="~/assets/images/bg.jpg" alt="" />
-    <form class="login-form" @submit.prevent="login" autocomplete="off">
+    <form
+      class="login-form"
+      @submit.prevent="login"
+      autocomplete="off"
+    >
       <div class="login-form__header">
         <img src="~/assets/images/logo_light.png" alt=""/>
       </div>
       <div class="login-form__body">
         <div class="form-item">
           <FloatLabel variant="on">
-            <InputText id="email" v-model="email" autocomplete="off"/>
+            <InputText
+              id="email"
+              v-model="formData.email"
+              autocomplete="off"
+              :invalid="errors.email"
+              @input="checkForm('email')"
+              @blur="checkForm('email')"
+            />
             <label for="email">Email</label>
           </FloatLabel>
         </div>
         <div class="form-item">
           <FloatLabel variant="on">
-            <InputText id="password" v-model="password" autocomplete="off" style="-webkit-text-security: disc"/>
+            <InputText
+              id="password"
+              v-model="formData.password"
+              autocomplete="off"
+              style="-webkit-text-security: disc"
+              :invalid="errors.password"
+              @input="checkForm('password')"
+              @blur="checkForm('password')"
+            />
             <label for="password">Пароль</label>
           </FloatLabel>
         </div>
@@ -38,11 +57,18 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'auth', middleware: 'auth' })
-const email = ref('root')
-const password = ref('root')
+const formData = ref({
+  email: '',
+  password: ''
+})
 const remember = ref(false)
 const error = ref('')
 const router = useRouter()
+
+const errors = ref({
+  email: false,
+  password: false
+})
 
 // Получаем refreshSession из композабла
 const {fetch: refreshSession} = useUserSession()
@@ -50,16 +76,32 @@ const {fetch: refreshSession} = useUserSession()
 // Импортием композабл для загрузки данных авторизации
 const { loadAuthData } = useAuthData()
 
+const checkForm = (field: string) => {
+  // @ts-ignore
+  if (!formData.value[field]) {
+    // @ts-ignore
+    errors.value[field] = true
+  }
+  // @ts-ignore
+  else errors.value[field] = false
+}
+
 async function login() {
   // Сбрасываем предыдущую ошибку
   error.value = ''
 
   try {
     // Отправляем запрос логина
-    await $fetch('/api/login', {
+    const result = await $fetch('/api/users/login', {
       method: 'POST',
-      body: {email: email.value, password: password.value, remember: remember.value}
+      body: {
+        email: formData.value.email,
+        password: formData.value.password,
+        remember: remember.value
+      }
     })
+    // @ts-ignore
+    if (!result.success) return
 
     // Принудительно обновляем состояние сессии на клиенте
     await refreshSession()

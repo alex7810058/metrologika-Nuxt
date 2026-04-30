@@ -1,4 +1,4 @@
-import { Pool, types } from 'pg'
+import { Pool, types, QueryResult } from 'pg'
 
 // Парсим BIGINT (int8) как число (ОСТОРОЖНО: может потерять точность при ID > 2^53)
 types.setTypeParser(types.builtins.INT8, (val: string) => parseInt(val, 10))
@@ -32,5 +32,5 @@ pool.on('error', (err) => {
   process.exit(-1)
 })
 
-export const query = (text: string, params?: any[]) => pool.query(text, params)
+export const query = (text: string, params?: any[]): Promise<QueryResult> => pool.query(text, params)
 export const closeDb = () => pool.end()

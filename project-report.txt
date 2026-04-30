@@ -3,10 +3,13 @@
 
 ├── 📁 app
 │   ├── 📁 components
+│   │   ├── 📁 dialogs
+│   │   │   └── 📄 UserDialog.vue
 │   │   ├── 📄 AppLayoutMainContainer.vue
 │   │   ├── 📄 AppLayoutSidebar.vue
 │   │   └── 📄 AppLayoutTopbar.vue
 │   ├── 📁 composables
+│   │   └── 📄 useAuthData.ts
 │   ├── 📁 layouts
 │   │   ├── 📄 auth.vue
 │   │   └── 📄 default.vue
@@ -17,7 +20,8 @@
 │   │   ├── 📄 login.vue
 │   │   └── 📄 users.vue
 │   ├── 📁 stores
-│   │   └── 📄 app.store.ts
+│   │   ├── 📄 app.store.ts
+│   │   └── 📄 cache.store.ts
 │   ├── 📁 styles
 │   │   ├── 📁 components
 │   │   │   ├── 📄 _app-layout.scss
@@ -28,7 +32,8 @@
 │   │   ├── 📄 _fonts.scss
 │   │   └── 📄 app.scss
 │   ├── 📄 app-default.vue
-│   └── 📄 app.vue
+│   ├── 📄 app.vue
+│   └── 📄 types.ts
 ├── 📁 public
 │   ├── 📄 favicon.ico
 │   └── 📄 robots.txt
@@ -39,6 +44,7 @@
 │   │   ├── 📄 login.post.ts
 │   │   ├── 📄 logout.post.ts
 │   │   ├── 📄 long-task.post.ts
+│   │   ├── 📄 roles.get.ts
 │   │   ├── 📄 user.post.ts
 │   │   └── 📄 users.get.ts
 │   ├── 📁 plugins
@@ -54,10 +60,84 @@
 └── 📄 tsconfig.json
 
 ==================================================
-📊 Статистика: 16 папок, 35 файлов
+📊 Статистика: 17 папок, 40 файлов
 
 📄 СОДЕРЖИМОЕ ФАЙЛОВ:
 ==================================================
+
+
+========================================
+ФАЙЛ: app\components\dialogs\UserDialog.vue
+========================================
+
+<template>
+  <Dialog
+    v-model:visible="appStore.userDialog.show"
+    modal
+    :draggable="false"
+    :style="{ width: '30rem' }"
+  >
+    <template #header>
+      <div class="title">
+        <span class="text-small">Пользователь</span>
+        {{ appStore.userDialog.method === 'create' ? 'Новый пользователь' : appStore.userDialog.dataOriginal?.name}}
+      </div>
+    </template>
+    <div class="form-info" v-if="appStore.userDialog.method === 'update'">
+      <div class="form-info-item">
+        ID: {{ appStore.userDialog.data.id }}
+      </div>
+      <div class="form-info-item">
+        Дата создания: {{ new Date(appStore.userDialog.data.created_at).toLocaleDateString('ru-RU') }}
+      </div>
+      <div class="form-info-item" v-if="appStore.userDialog.data.updated_at">
+        Дата изменения: {{ new Date(appStore.userDialog.data.updated_at).toLocaleDateString('ru-RU') }}
+      </div>
+    </div>
+    <form ref="userForm" @submit.prevent="submit" autocomplete="off" style="margin-top: 7px">
+      <div class="form-item">
+        <FloatLabel variant="on">
+          <InputText id="email" v-model="appStore.userDialog.data.email" autocomplete="off" />
+          <label for="email">Email</label>
+        </FloatLabel>
+      </div>
+      <div class="form-item">
+        <FloatLabel variant="on">
+          <InputText id="password" v-model="appStore.userDialog.data.name" autocomplete="off" />
+          <label for="password">Имя</label>
+        </FloatLabel>
+      </div>
+      <div class="form-item">
+        <FloatLabel variant="on">
+          <Select
+            v-model="appStore.userDialog.data.role_id"
+            inputId="role"
+            :options="cacheStore.roles"
+            optionLabel="ru_name"
+            optionValue="id"
+            checkmark
+            :highlightOnSelect="false"
+          />
+          <label for="role">Роль</label>
+        </FloatLabel>
+      </div>
+    </form>
+    <template #footer>
+      <Button label="Отмена" text severity="secondary" @click="appStore.closeUserDialog()" />
+      <Button label="Сохранить" autofocus type="button" @click="userForm!.requestSubmit()" />
+    </template>
+  </Dialog>
+</template>
+
+<script setup lang="ts">
+const appStore = useAppStore()
+const cacheStore = useCacheStore()
+const userForm = ref<HTMLFormElement | null>(null)
+
+const submit = () => {
+  console.log(1111)
+}
+</script>
 
 
 ========================================
@@ -138,14 +218,53 @@ const items = ref([
 </template>
 
 <script setup lang="ts">
-import { useAppStore} from '~/stores/app.store'
-const { sidebarCompact, setSidebarCompact } = useAppStore()
+import { useAppStore } from '~/stores/app.store'
+import { storeToRefs } from 'pinia'
+
+const appStore = useAppStore()
+const { sidebarCompact } = storeToRefs(appStore)
+const { setSidebarCompact } = appStore
 
 const onClickMenuButton = () => {
-  console.log(sidebarCompact)
-  setSidebarCompact(!sidebarCompact)
+  console.log(sidebarCompact.value) // true/false
+  setSidebarCompact(!sidebarCompact.value)
 }
 </script>
+
+
+========================================
+ФАЙЛ: app\composables\useAuthData.ts
+========================================
+
+import type { User, Role } from '~/types'
+
+/**
+ * Композабл для загрузки всех необходимых данных после авторизации
+ * Используется как при логине, так и при обновлении страницы (восстановлении сессии)
+ */
+export function useAuthData() {
+  const cacheStore = useCacheStore()
+
+  /**
+   * Загружает все необходимые данные для авторизованного пользователя
+   */
+  async function loadAuthData() {
+    try {
+      await Promise.all([
+        $fetch('/api/users').then((data: User[]) => cacheStore.setUsers(data)),
+        $fetch('/api/roles').then((data: Role[]) => cacheStore.setRoles(data)),
+      ])
+    }
+    catch (error) {
+      console.error('Failed to load auth data:', error)
+      throw error
+    }
+  }
+
+  return {
+    loadAuthData
+  }
+}
 
 
 ========================================
@@ -178,8 +297,10 @@ const onClickMenuButton = () => {
 </template>
 
 <script setup lang="ts">
-import { useAppStore} from '~/stores/app.store'
-const { sidebarCompact } = useAppStore()
+import { storeToRefs } from 'pinia'
+
+const appStore = useAppStore()
+const { sidebarCompact } = storeToRefs(appStore)
 
 import AppLayoutTopbar from '~/components/AppLayoutTopbar.vue'
 import AppLayoutSidebar from '~/components/AppLayoutSidebar.vue'
@@ -191,22 +312,18 @@ import AppLayoutMainContainer from '~/components/AppLayoutMainContainer.vue'
 ФАЙЛ: app\middleware\auth.ts
 ========================================
 
-export default defineNuxtRouteMiddleware(async (to) => {
-  const { loggedIn, fetch } = useUserSession();
-
-  // Ждём загрузки состояния сессии
-  await fetch();
-
-  console.log('Logged in status:', loggedIn.value);
-
-  if (loggedIn.value && to.path === '/login') {
-    return navigateTo('/');
-  }
-
+export default defineNuxtRouteMiddleware((to) => {
+  const { loggedIn } = useUserSession()
+  
+  // Проверка состояния сессии (уже загружено автоматически)
   if (!loggedIn.value && to.path !== '/login') {
-    return navigateTo('/login');
+    return navigateTo('/login')
   }
-});
+  
+  if (loggedIn.value && to.path === '/login') {
+    return navigateTo('/')
+  }
+})
 
 
 ========================================
@@ -215,48 +332,51 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
 <script setup lang="ts">
 // Авто-редирект если не залогинен (middleware)
-definePageMeta({ middleware: 'auth' });
+definePageMeta({ middleware: 'auth' })
 
-const { user, loggedIn, clear } = useUserSession();
-const jobId = ref('');
-const taskStatus = ref<'idle' | 'pending' | 'completed' | 'failed'>('idle');
-const resultData = ref<any>(null);
-let eventSource: EventSource | null = null;
+const { user, loggedIn, clear } = useUserSession()
+const cacheStore = useCacheStore()
+const jobId = ref('')
+const taskStatus = ref<'idle' | 'pending' | 'completed' | 'failed'>('idle')
+const resultData = ref<any>(null)
+let eventSource: EventSource | null = null
 
 async function logout() {
-  await $fetch('/api/logout', { method: 'POST' });
-  await clear();
-  await navigateTo('/login');
+  await $fetch('/api/logout', { method: 'POST' })
+  await clear()
+  // Очищаем кэш при логауте
+  cacheStore.clearCache()
+  await navigateTo('/login')
 }
 
 async function startLongTask() {
-  const newJobId = crypto.randomUUID();
-  jobId.value = newJobId;
-  taskStatus.value = 'pending';
+  const newJobId = crypto.randomUUID()
+  jobId.value = newJobId
+  taskStatus.value = 'pending'
 
   // Открываем SSE
-  eventSource = new EventSource(`/api/sse/status?jobId=${newJobId}`);
+  eventSource = new EventSource(`/api/sse/status?jobId=${newJobId}`)
   eventSource.onmessage = (e) => {
-    const data = JSON.parse(e.data);
+    const data = JSON.parse(e.data)
     if (data.status === 'completed') {
-      resultData.value = data.data;
-      taskStatus.value = 'completed';
-      eventSource?.close();
+      resultData.value = data.data
+      taskStatus.value = 'completed'
+      eventSource?.close()
     } else if (data.status === 'failed') {
-      taskStatus.value = 'failed';
-      eventSource?.close();
+      taskStatus.value = 'failed'
+      eventSource?.close()
     }
-  };
+  }
   eventSource.onerror = () => {
-    taskStatus.value = 'failed';
-    eventSource?.close();
-  };
+    taskStatus.value = 'failed'
+    eventSource?.close()
+  }
 
   try {
-    await $fetch('/api/long-task', { method: 'POST', body: { jobId: newJobId } });
+    await $fetch('/api/long-task', { method: 'POST', body: { jobId: newJobId } })
   } catch (err) {
-    taskStatus.value = 'failed';
-    eventSource?.close();
+    taskStatus.value = 'failed'
+    eventSource?.close()
   }
 }
 </script>
@@ -288,20 +408,39 @@ async function startLongTask() {
 <template>
   <div class="auth-layout">
     <img class="bg" src="~/assets/images/bg.jpg" alt="" />
-    <form class="login-form" @submit.prevent="login" autocomplete="off">
+    <form
+      class="login-form"
+      @submit.prevent="login"
+      autocomplete="off"
+    >
       <div class="login-form__header">
         <img src="~/assets/images/logo_light.png" alt=""/>
       </div>
       <div class="login-form__body">
         <div class="form-item">
           <FloatLabel variant="on">
-            <InputText id="email" v-model="email" autocomplete="off"/>
+            <InputText
+              id="email"
+              v-model="formData.email"
+              autocomplete="off"
+              :invalid="errors.email"
+              @input="checkForm('email')"
+              @blur="checkForm('email')"
+            />
             <label for="email">Email</label>
           </FloatLabel>
         </div>
         <div class="form-item">
           <FloatLabel variant="on">
-            <InputText id="password" v-model="password" autocomplete="off" style="-webkit-text-security: disc"/>
+            <InputText
+              id="password"
+              v-model="formData.password"
+              autocomplete="off"
+              style="-webkit-text-security: disc"
+              :invalid="errors.password"
+              @input="checkForm('password')"
+              @blur="checkForm('password')"
+            />
             <label for="password">Пароль</label>
           </FloatLabel>
         </div>
@@ -309,7 +448,7 @@ async function startLongTask() {
       <div class="login-form__footer">
         <div class="more">
           <div class="more-item">
-            <Checkbox inputId="remember" value="Cheese" />
+            <Checkbox inputId="remember" v-model="remember" :binary="true" />
             <label for="remember">Запомнить меня</label>
           </div>
           <div class="more-item">
@@ -324,31 +463,61 @@ async function startLongTask() {
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: 'auth', middleware: 'auth' });
-const email = ref('root')
-const password = ref('root')
+definePageMeta({ layout: 'auth', middleware: 'auth' })
+const formData = ref({
+  email: '',
+  password: ''
+})
+const remember = ref(false)
 const error = ref('')
-const router = useRouter() // Импортируем роутер, если его нет
+const router = useRouter()
+
+const errors = ref({
+  email: false,
+  password: false
+})
 
 // Получаем refreshSession из композабла
 const {fetch: refreshSession} = useUserSession()
+
+// Импортием композабл для загрузки данных авторизации
+const { loadAuthData } = useAuthData()
+
+const checkForm = (field: string) => {
+  // @ts-ignore
+  if (!formData.value[field]) {
+    // @ts-ignore
+    errors.value[field] = true
+  }
+  // @ts-ignore
+  else errors.value[field] = false
+}
 
 async function login() {
   // Сбрасываем предыдущую ошибку
   error.value = ''
 
   try {
-    // 1. Отправляем запрос на сервер для установки сессии
-    await $fetch('/api/login', {
+    // Отправляем запрос логина
+    const result = await $fetch('/api/login', {
       method: 'POST',
-      body: {email: email.value, password: password.value}
+      body: {
+        email: formData.value.email,
+        password: formData.value.password,
+        remember: remember.value
+      }
     })
+    // @ts-ignore
+    if (!result.success) return
 
-    // 2. КЛЮЧЕВОЙ МОМЕНТ: принудительно обновляем состояние сессии на клиенте
+    // Принудительно обновляем состояние сессии на клиенте
     await refreshSession()
 
-    // 3. Перенаправляем на главную страницу
-    await router.push('/') // или используйте navigateTo('/')
+    // Загружаем все необходимые данные через централизованный композабл
+    await loadAuthData()
+
+    // Перенаправляем на главную страницу
+    await router.push('/')
 
   }
   catch (err: any) {
@@ -363,18 +532,73 @@ async function login() {
 ФАЙЛ: app\pages\users.vue
 ========================================
 
-<script setup lang="ts">
-// Авто-редирект если не залогинен (middleware)
-definePageMeta({ middleware: 'auth' });
-</script>
-
 <template>
+
   <Card>
     <template #content>
-      users
+      <div class="page-header">
+        <div class="page-header__title">
+          <h1>Пользователи</h1>
+        </div>
+        <div class="page-header__buttons">
+          <Button icon="pi pi-plus" variant="outlined" severity="secondary" label="Добавить" @click="showUserDialog('create', {})"/>
+        </div>
+      </div>
+      <DataTable
+        :value="users"
+        stripedRows
+        tableStyle="min-width: 50rem"
+      >
+        <Column field="id" header="ID" class="width-1" />
+        <Column field="name" header="Имя" />
+        <Column header="Роль">
+          <template #body="{ data }">
+            {{ cacheStore.rolesById[data.id]?.ru_name }}
+          </template>
+        </Column>
+        <Column field="email" header="Email" />
+        <Column field="created_at" header="Дата создания">
+          <template #body="{ data }">
+            {{ new Date(data.created_at).toLocaleDateString('ru-RU') }}
+          </template>
+        </Column>
+        <Column class="width-1">
+          <template #body="{ data }">
+            <div class="buttons">
+              <Button icon="pi pi-pen-to-square" class="mr-2" severity="secondary" rounded text @click="showUserDialog('update', data)"/>
+              <Button icon="pi pi-times" severity="secondary" rounded text />
+            </div>
+          </template>
+        </Column>
+      </DataTable>
     </template>
   </Card>
+
+  <UserDialog/>
+
 </template>
+
+<script setup lang="ts">
+// Авто-редирект если не залогинен (middleware)
+definePageMeta({middleware: 'auth'})
+
+const appStore = useAppStore()
+const cacheStore = useCacheStore()
+
+import UserDialog from '~/components/dialogs/UserDialog.vue'
+
+// Получаем пользователей из кэша
+const users = computed(() => cacheStore.users)
+
+const showUserDialog = (method: string, data: any) => {
+  appStore.setUserDialog({
+    show: true,
+    method,
+    data: {...data},
+    dataOriginal: {...data}
+  })
+}
+</script>
 
 
 ========================================
@@ -385,14 +609,89 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useAppStore = defineStore('app', () => {
-  const sidebarCompact = ref<boolean>(true)
 
+  // Сайдбар
+  const sidebarCompact = ref<boolean>(false)
   const setSidebarCompact = (_value: boolean) => sidebarCompact.value = _value
+
+  // Диалоговое окно пользователя
+  const userDialogDefaultValue = {
+    show: false,
+    method: '',
+    data: <any>{},
+    dataOriginal: <any>{}
+  }
+  const userDialog = ref(userDialogDefaultValue)
+  const setUserDialog = (_value: any) => userDialog.value = _value
+  const closeUserDialog = () => userDialog.value = userDialogDefaultValue
 
   return {
     sidebarCompact,
+    setSidebarCompact,
 
-    setSidebarCompact
+    userDialog,
+    setUserDialog,
+    closeUserDialog
+  }
+})
+
+
+========================================
+ФАЙЛ: app\stores\cache.store.ts
+========================================
+
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import type { User, Role } from '~/types'
+
+export const useCacheStore = defineStore('cache', () => {
+
+  // Пользователи
+  const users = ref<User[]>([])
+  const usersById = ref<Record<any, User>>({})
+  const usersLoaded = ref(false)
+
+  // Установка пользователей
+  const setUsers = (data: User[]) => {
+    users.value = data
+    const byId: Record<string, User> = {}
+    data.forEach((item: User) => byId[String(item.id)] = item)
+    usersById.value = byId
+    usersLoaded.value = true
+  }
+
+  // Роли
+  const roles = ref<Role[]>([])
+  const rolesById = ref<Record<any, Role>>({})
+  const rolesLoaded = ref(false)
+
+  // Установка ролей
+  const setRoles = (data: Role[]) => {
+    roles.value = data
+    const byId: Record<string, Role> = {}
+    data.forEach((item: Role) => byId[String(item.id)] = item)
+    rolesById.value = byId
+    rolesLoaded.value = true
+  }
+
+  // Очистка кэша (при логауте)
+  const clearCache = () => {
+    users.value = []
+    usersLoaded.value = false
+    roles.value = []
+    rolesLoaded.value = false
+  }
+
+  return {
+    users,
+    usersById,
+    usersLoaded,
+    setUsers,
+    roles,
+    rolesById,
+    rolesLoaded,
+    setRoles,
+    clearCache
   }
 })
 
@@ -402,7 +701,7 @@ export const useAppStore = defineStore('app', () => {
 ========================================
 
 .app-layout {
-  // height: 100vh;
+  min-height: 100vh;
   width: 100%;
   position: relative;
 
@@ -412,7 +711,7 @@ export const useAppStore = defineStore('app', () => {
     left: 0;
     right: 0;
     height: 56px;
-    padding: 0 28px;
+    padding: 0 28px 0 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -464,6 +763,7 @@ export const useAppStore = defineStore('app', () => {
         &-link {
           padding-top: 12px;
           padding-bottom: 12px;
+          min-height: 44px;
         }
       }
     }
@@ -481,9 +781,18 @@ export const useAppStore = defineStore('app', () => {
 
   &-main {
     width: 100%;
+
+    > .p-card {
+      height: 100%;
+
+      > .p-card-body {
+        padding: 27px;
+      }
+    }
   }
 
   &--sidebar-compact {
+
     .app-layout-sidebar {
       width: 56px;
 
@@ -496,6 +805,10 @@ export const useAppStore = defineStore('app', () => {
           display: none !important;
         }
       }
+    }
+
+    .app-layout-main-container {
+      left: calc(56px + 28px)
     }
   }
 }
@@ -515,6 +828,7 @@ export const useAppStore = defineStore('app', () => {
   background: #f5f5f5;
   position: relative;
   overflow: hidden;
+  padding: 16px;
 
   .bg {
     display: block;
@@ -560,6 +874,18 @@ export const useAppStore = defineStore('app', () => {
 
       button {
         width: 120px;
+      }
+    }
+  }
+
+  @media (max-width: 600px) {
+    .login-form {
+      width: 100%;
+
+      &__header {
+        img {
+          max-width: 300px;
+        }
       }
     }
   }
@@ -612,13 +938,18 @@ body, button, input, select {
 h1, h2, h3, h4, h5 {
   display: block;
   margin-top: 0;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 23px;
 }
 
 img {
   display: block !important;
 }
 
-input {
+input, .p-select {
   min-width: 100%;
 }
 
@@ -642,6 +973,53 @@ input {
   }
 }
 
+.p-select-list {
+  .p-select-option {
+    &[aria-selected="true"] {
+      color: var(--p-primary-500) !important;
+      font-weight: 500 !important;
+
+      .p-select-option-check-icon {
+        color: var(--p-primary-500) !important;
+      }
+    }
+  }
+}
+
+.text-small {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.p-dialog-header {
+  .title {
+    font-size: 20px;
+    font-weight: 700;
+
+    span {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--p-floatlabel-active-color);
+    }
+  }
+}
+
+.form-info {
+  font-size: 14px;
+  margin-bottom: 30px;
+  background: #f3f4f6;
+  padding: 6px 0;
+  border-radius: 6px;
+
+  &-item {
+    padding: 3px 12px;
+    // border-bottom: solid 1px #eee;
+    &:nth-child(even) {
+      // background: var(--p-datatable-row-striped-background);
+    }
+  }
+}
+
 a.link {
   color: var(--p-primary-500);
   text-decoration: underline;
@@ -649,6 +1027,29 @@ a.link {
 
   &:hover {
     color: var(--p-primary-600);
+  }
+}
+
+td {
+  &.width-1 {
+    width: 1px;
+  }
+  .buttons {
+    margin: -10px -10px -10px 0;
+    display: flex;
+  }
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+
+  &__title {
+    h1 {
+      margin: 0;
+    }
   }
 }
 
@@ -936,17 +1337,50 @@ a.link {
 </template>
 
 
+
+
 ========================================
 ФАЙЛ: app\app.vue
 ========================================
 
 <script setup lang="ts">
+// При инициализации приложения проверяем сессию и загружаем данные если авторизированы
+import type { User } from '~/types'
+import { useAuthData } from '~/composables/useAuthData'
+
+const { loggedIn } = useUserSession()
+
+// Если уже авторизованы (например, после перезагрузки страницы), загружаем все необходимые данные
+if (loggedIn.value) {
+  const { loadAuthData } = useAuthData()
+  await loadAuthData()
+}
 </script>
 <template>
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
 </template>
+
+
+========================================
+ФАЙЛ: app\types.ts
+========================================
+
+export interface User {
+  id: number
+  email: string
+  name: string
+  created_at: string
+  role_id?: number | null
+}
+
+export interface Role {
+  id: number
+  name: string
+  ru_name: string
+  description: string
+}
 
 
 ========================================
@@ -967,51 +1401,51 @@ Disallow:
 ФАЙЛ: server\api\sse\status.get.ts
 ========================================
 
-import { getTaskResult, taskEmitter } from '../../utils/taskStore';
+import { getTaskResult, taskEmitter } from '../../utils/taskStore'
 
 export default defineEventHandler(async (event) => {
   // Защита: только авторизованные
-  const session = await requireUserSession(event);
+  const session = await requireUserSession(event)
 
-  const query = getQuery(event);
-  const jobId = query.jobId as string;
-  if (!jobId) throw createError({ statusCode: 400, message: 'jobId required' });
+  const query = getQuery(event)
+  const jobId = query.jobId as string
+  if (!jobId) throw createError({ statusCode: 400, message: 'jobId required' })
 
-  const res = event.node.res;
+  const res = event.node.res
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-  });
+  })
 
   const send = (data: any) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  };
+    res.write(`data: ${JSON.stringify(data)}\n\n`)
+  }
 
   // Уже готовый результат?
-  const existing = getTaskResult(jobId);
+  const existing = getTaskResult(jobId)
   if (existing) {
-    send(existing);
-    res.end();
-    return;
+    send(existing)
+    res.end()
+    return
   }
 
   // Ожидаем события
   const handler = (taskResult: any) => {
-    send(taskResult);
-    res.end();
-    taskEmitter.off(`task:${jobId}`, handler);
-  };
-  taskEmitter.on(`task:${jobId}`, handler);
+    send(taskResult)
+    res.end()
+    taskEmitter.off(`task:${jobId}`, handler)
+  }
+  taskEmitter.on(`task:${jobId}`, handler)
 
   event.node.req.on('close', () => {
-    taskEmitter.off(`task:${jobId}`, handler);
-    if (!res.writableEnded) res.end();
-  });
+    taskEmitter.off(`task:${jobId}`, handler)
+    if (!res.writableEnded) res.end()
+  })
 
   // Предотвращаем автоматическое закрытие Nitro
-  return new Promise(() => {});
-});
+  return new Promise(() => {})
+})
 
 
 ========================================
@@ -1023,7 +1457,7 @@ import bcrypt from 'bcrypt'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const {email, password} = body
+  const {email, password, remember} = body
 
   // Ищем пользователя в БД
   const result = await query('SELECT * FROM users WHERE email = $1', [email])
@@ -1036,10 +1470,13 @@ export default defineEventHandler(async (event) => {
   // Проверка пароля (предполагаем, что хранится хеш)
   const isValid = await bcrypt.compare(password, user.password)
   if (!isValid) {
-    return {error: true, message: 'Invalid credentials'}
+    return {success: false, message: 'Invalid credentials'}
   }
 
-  // Устанавливаем сессию
+  // Устанавливаем сессию с учетом флага "Запомнить меня"
+  // Если remember=true, сессия будет жить 30 дней, иначе - до закрытия браузера
+  const maxAge = remember ? 60 * 60 * 24 * 30 : undefined // 30 дней в секундах
+
   await setUserSession(event, {
     user: {
       id: user.id,
@@ -1047,6 +1484,8 @@ export default defineEventHandler(async (event) => {
       name: user.name
     },
     loggedInAt: Date.now()
+  }, {
+    maxAge
   })
 
   return {success: true}
@@ -1058,94 +1497,51 @@ export default defineEventHandler(async (event) => {
 ========================================
 
 export default defineEventHandler(async (event) => {
-  await clearUserSession(event);
-  return { success: true };
-});
+  await clearUserSession(event)
+  return { success: true }
+})
 
 
 ========================================
 ФАЙЛ: server\api\long-task.post.ts
 ========================================
 
-import { setTaskResult } from '../utils/taskStore';
+import { setTaskResult } from '../utils/taskStore'
 
 function generateRandomData() {
-  const records = [];
+  const records = []
   for (let i = 0; i < 1000; i++) {
     records.push({
       id: i + 1,
       value: Math.random() * 100,
       text: `Record ${i + 1}`,
       timestamp: new Date().toISOString(),
-    });
+    })
   }
-  return records;
+  return records
 }
 
 export default defineEventHandler(async (event) => {
   // Защита: только для авторизованных
-  const session = await requireUserSession(event);
+  const session = await requireUserSession(event)
 
-  const body = await readBody(event);
-  const { jobId } = body;
-  if (!jobId) throw createError({ statusCode: 400, message: 'jobId required' });
+  const body = await readBody(event)
+  const { jobId } = body
+  if (!jobId) throw createError({ statusCode: 400, message: 'jobId required' })
 
   // Запускаем фоновую задачу
   setTimeout(async () => {
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    const result = generateRandomData();
-    setTaskResult(jobId, result);
-  }, 0);
+    await new Promise(resolve => setTimeout(resolve, 5000))
+    const result = generateRandomData()
+    setTaskResult(jobId, result)
+  }, 0)
 
-  return { status: 'accepted', jobId, message: 'Task accepted' };
-});
-
-
-========================================
-ФАЙЛ: server\api\user.post.ts
-========================================
-
-// server/api/users.post.ts
-import { query } from '../utils/db'
-import bcrypt from 'bcrypt'
-
-export default defineEventHandler(async (event) => {
-  // Только для админов (если нужно) – можно убрать или оставить
-  await requireUserSession(event)
-
-  const body = await readBody(event)
-  const {email, name, password} = body // теперь получаем обычный пароль
-
-  if (!email || !name || !password) {
-    setResponseStatus(event, 400)
-    return {error: true, message: 'Missing fields: email, name, password'}
-  }
-
-  // Хэшируем пароль на сервере
-  const saltRounds = 10
-  const password_hash = await bcrypt.hash(password, saltRounds)
-
-  try {
-    const result = await query(
-      'INSERT INTO users (email, name, password) VALUES ($1, $2, $3) RETURNING id, email, name',
-      [email, name, password_hash]
-    )
-    return result.rows[0]
-  }
-  catch (error: any) {
-    if (error.code === '23505') { // нарушение уникальности email
-      setResponseStatus(event, 409)
-      return {error: true, message: 'User with this email already exists'}
-    }
-    console.error(error)
-    setResponseStatus(event, 500)
-    return {error: true, message: 'Internal server error'}
-  }
+  return { status: 'accepted', jobId, message: 'Task accepted' }
 })
 
 
 ========================================
-ФАЙЛ: server\api\users.get.ts
+ФАЙЛ: server\api\roles.get.ts
 ========================================
 
 // server/api/users.get.ts
@@ -1156,7 +1552,7 @@ export default defineEventHandler(async (event) => {
   await requireUserSession(event)
 
   try {
-    const result = await query('SELECT id, email, name, created_at FROM users ORDER BY id')
+    const result = await query('SELECT * FROM roles ORDER BY id')
     return result.rows
   }
   catch (error) {
@@ -1167,35 +1563,128 @@ export default defineEventHandler(async (event) => {
 
 
 ========================================
+ФАЙЛ: server\api\user.post.ts
+========================================
+
+import { query } from '../utils/db'
+import bcrypt from 'bcrypt'
+
+export default defineEventHandler(async (event) => {
+  await requireUserSession(event)
+
+  const body = await readBody(event)
+  const { email, name, password, role_id } = body
+
+  if (!email || !name || !password) {
+    setResponseStatus(event, 400)
+    return { error: true, message: 'Missing fields: email, name, password' }
+  }
+
+  const saltRounds = 10
+  const password_hash = await bcrypt.hash(password, saltRounds)
+
+  try {
+    // Начинаем транзакцию
+    await query('BEGIN')
+
+    const insertResult = await query(
+      'INSERT INTO users (email, name, password) VALUES ($1, $2, $3) RETURNING id, email, name',
+      [email, name, password_hash]
+    )
+    const newUser = insertResult.rows[0]
+
+    // Назначаем роль (по умолчанию 'user', если не указана)
+    let targetRoleId = role_id
+    if (!targetRoleId) {
+      const defaultRole = await query(`SELECT id FROM roles WHERE name = 'user'`)
+      if (defaultRole.rows.length) targetRoleId = defaultRole.rows[0].id
+      else throw new Error('Default role not found')
+    }
+
+    await query(
+      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
+      [newUser.id, targetRoleId]
+    )
+
+    await query('COMMIT')
+
+    // Возвращаем пользователя с role_id
+    return {
+      ...newUser,
+      role_id: targetRoleId
+    }
+  } catch (error: any) {
+    await query('ROLLBACK')
+    if (error.code === '23505') {
+      setResponseStatus(event, 409)
+      return { error: true, message: 'User with this email already exists' }
+    }
+    console.error(error)
+    setResponseStatus(event, 500)
+    return { error: true, message: 'Internal server error' }
+  }
+})
+
+
+========================================
+ФАЙЛ: server\api\users.get.ts
+========================================
+
+import { query } from '../utils/db'
+
+export default defineEventHandler(async (event) => {
+  await requireUserSession(event)
+
+  try {
+    const result = await query(`
+        SELECT
+            u.id, u.email, u.email_verified_at, u.name, u.created_at, u.updated_at, u.active,
+            ur.role_id
+        FROM users u
+                 LEFT JOIN (
+            SELECT DISTINCT ON (user_id) user_id, role_id
+            FROM user_roles
+        ) ur ON u.id = ur.user_id
+        ORDER BY u.id
+    `)
+    return result.rows
+  } catch (error) {
+    console.error(error)
+    throw createError({ statusCode: 500, message: 'Database error' })
+  }
+})
+
+
+========================================
 ФАЙЛ: server\plugins\migrations.ts
 ========================================
 
-import { runMigrations } from '../utils/migrations';
+import { runMigrations } from '../utils/migrations'
 
 export default defineNitroPlugin(async (nitroApp) => {
-  console.log('📦 Running database migrations...');
-  await runMigrations();
-});
+  console.log('📦 Running database migrations...')
+  await runMigrations()
+})
 
 
 ========================================
 ФАЙЛ: server\utils\db.ts
 ========================================
 
-import { Pool, types } from 'pg';
+import { Pool, types } from 'pg'
 
 // Парсим BIGINT (int8) как число (ОСТОРОЖНО: может потерять точность при ID > 2^53)
-types.setTypeParser(types.builtins.INT8, (val: string) => parseInt(val, 10));
+types.setTypeParser(types.builtins.INT8, (val: string) => parseInt(val, 10))
 
 // Парсим NUMERIC и FLOAT8 как float
-types.setTypeParser(types.builtins.NUMERIC, (val: string) => parseFloat(val));
-types.setTypeParser(types.builtins.FLOAT8, (val: string) => parseFloat(val));
+types.setTypeParser(types.builtins.NUMERIC, (val: string) => parseFloat(val))
+types.setTypeParser(types.builtins.FLOAT8, (val: string) => parseFloat(val))
 
 // INT4, INT2 и так по умолчанию числа, но для единообразия:
-types.setTypeParser(types.builtins.INT4, (val: string) => parseInt(val, 10));
-types.setTypeParser(types.builtins.INT2, (val: string) => parseInt(val, 10));
+types.setTypeParser(types.builtins.INT4, (val: string) => parseInt(val, 10))
+types.setTypeParser(types.builtins.INT2, (val: string) => parseInt(val, 10))
 
-console.log('DB parsers set: INT8 -> number');
+console.log('DB parsers set: INT8 -> number')
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -1205,28 +1694,29 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   max: 20,
   idleTimeoutMillis: 30000,
-});
+})
 
 pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL');
-});
+  console.log('✅ Connected to PostgreSQL')
+})
 
 pool.on('error', (err) => {
-  console.error('❌ Unexpected error on idle client', err);
-  process.exit(-1);
-});
+  console.error('❌ Unexpected error on idle client', err)
+  process.exit(-1)
+})
 
-export const query = (text: string, params?: any[]) => pool.query(text, params);
-export const closeDb = () => pool.end();
+export const query = (text: string, params?: any[]) => pool.query(text, params)
+export const closeDb = () => pool.end()
 
 
 ========================================
 ФАЙЛ: server\utils\migrations.ts
 ========================================
 
-import { query } from './db';
-import bcrypt from 'bcrypt';
+import { query } from './db'
+import bcrypt from 'bcrypt'
 
+// Миграции для создания таблиц (без изменений)
 const migrations = [
   `create table if not exists users (
                                         id bigserial primary key,
@@ -1237,25 +1727,8 @@ const migrations = [
                                         remember_token text null,
                                         created_at timestamptz not null default now(),
                                         updated_at timestamptz not null default now(),
-                                        active boolean not null default true,
-                                        role text not null default 'user'
+                                        active boolean not null default true
    )`,
-
-  `create table if not exists personal_access_tokens (
-                                                         id bigserial primary key,
-                                                         tokenable_type text not null,
-                                                         tokenable_id bigint not null references users(id) on delete cascade,
-                                                         name text not null default 'api',
-                                                         token varchar(64) not null unique,
-                                                         abilities text null,
-                                                         last_used_at timestamptz null,
-                                                         expires_at timestamptz null,
-                                                         created_at timestamptz not null default now(),
-                                                         updated_at timestamptz not null default now()
-   )`,
-
-  `create index if not exists idx_personal_access_tokens_tokenable on personal_access_tokens (tokenable_type, tokenable_id)`,
-  `create index if not exists idx_personal_access_tokens_expires_at on personal_access_tokens (expires_at)`,
 
   `create table if not exists sis (
                                       id bigserial primary key,
@@ -1278,36 +1751,172 @@ const migrations = [
    )`,
 
   `create index if not exists idx_sis_status on sis (status)`,
-];
+
+  `create table if not exists roles (
+                                        id bigserial primary key,
+                                        name text not null unique,
+                                        ru_name text not null unique,
+                                        description text,
+                                        created_at timestamptz not null default now(),
+                                        updated_at timestamptz not null default now()
+   )`,
+
+  `create table if not exists permissions (
+                                              id bigserial primary key,
+                                              name text not null unique,
+                                              resource text,
+                                              action text,
+                                              description text,
+                                              created_at timestamptz not null default now(),
+                                              updated_at timestamptz not null default now()
+   )`,
+
+  `create table if not exists role_permissions (
+                                                   role_id bigint not null references roles(id) on delete cascade,
+                                                   permission_id bigint not null references permissions(id) on delete cascade,
+                                                   primary key (role_id, permission_id)
+   )`,
+
+  `create table if not exists user_roles (
+                                             user_id bigint not null references users(id) on delete cascade,
+                                             role_id bigint not null references roles(id) on delete cascade,
+                                             primary key (user_id, role_id)
+   )`,
+
+  `create index if not exists idx_user_roles_user_id on user_roles(user_id)`,
+  `create index if not exists idx_role_permissions_role_id on role_permissions(role_id)`,
+]
 
 export async function runMigrations() {
-  // 1. Выполняем все SQL-миграции
+  // 1. Выполняем SQL-миграции для создания таблиц
   for (const sql of migrations) {
     try {
-      await query(sql);
-      console.log(`✅ Migration executed: ${sql.substring(0, 60)}...`);
+      await query(sql)
+      console.log(`✅ Migration executed: ${sql.substring(0, 60)}...`)
     } catch (err: any) {
-      console.error(`❌ Migration failed: ${sql}`);
-      console.error(err.message);
-      throw err;
+      console.error(`❌ Migration failed: ${sql}`)
+      console.error(err.message)
+      throw err
     }
   }
 
-  // 2. Создаём дефолтного суперадмина, если его нет
-  const existingAdmin = await query(`SELECT id FROM users WHERE email = $1`, ['root']);
+  // 2. Создаём дефолтного суперадмина (root), если его нет
+  const existingAdmin = await query(`SELECT id FROM users WHERE email = $1`, ['root'])
   if (existingAdmin.rows.length === 0) {
-    const hashedPassword = await bcrypt.hash('root', 10);
+    const hashedPassword = await bcrypt.hash('root', 10)
     await query(
-      `INSERT INTO users (name, email, password, role, active, email_verified_at)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      ['Super Admin', 'root', hashedPassword, 'superadmin', true, new Date()]
-    );
-    console.log('✅ Default superadmin user created (email: root, password: root)');
+      `INSERT INTO users (name, email, password, active, email_verified_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      ['Суперадмини', 'root', hashedPassword, true, new Date()]
+    )
+    console.log('✅ Default superadmin user created (email: root, password: root)')
   } else {
-    console.log('ℹ️ Superadmin already exists, skipping creation');
+    console.log('ℹ️ Superadmin already exists, skipping creation')
   }
 
-  console.log('🎉 All migrations completed successfully');
+  // ------------------------------------------------------------
+  // 3. Создание ролей (только если отсутствуют)
+  // ------------------------------------------------------------
+  const rolesToCreate = [
+    { name: 'superadmin', ru_name: 'Суперадминистратор', description: 'Полный доступ ко всему' },
+    { name: 'admin', ru_name: 'Администратор', description: 'Администратор, управление пользователями и контентом' },
+    { name: 'user', ru_name: 'Пользователь', description: 'Обычный пользователь' }
+  ]
+  for (const role of rolesToCreate) {
+    const existing = await query(`SELECT id FROM roles WHERE name = $1`, [role.name])
+    if (existing.rows.length === 0) {
+      await query(`INSERT INTO roles (name, ru_name, description) VALUES ($1, $2, $3)`, [role.name, role.ru_name, role.description])
+      console.log(`✅ Role created: ${role.name}`)
+    } else {
+      console.log(`ℹ️ Role already exists: ${role.name}`)
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 4. Создание базовых разрешений (только если отсутствуют)
+  // ------------------------------------------------------------
+  const permissionsToCreate = [
+    { name: 'users.view', resource: 'users', action: 'view', description: 'Просмотр списка пользователей' },
+    { name: 'users.create', resource: 'users', action: 'create', description: 'Создание пользователей' },
+    { name: 'users.edit', resource: 'users', action: 'edit', description: 'Редактирование пользователей' },
+    { name: 'users.delete', resource: 'users', action: 'delete', description: 'Удаление пользователей' },
+    { name: 'sis.view', resource: 'sis', action: 'view', description: 'Просмотр записей СИС' },
+    { name: 'sis.create', resource: 'sis', action: 'create', description: 'Создание записей СИС' },
+    { name: 'sis.edit', resource: 'sis', action: 'edit', description: 'Редактирование записей СИС' },
+    { name: 'sis.delete', resource: 'sis', action: 'delete', description: 'Удаление записей СИС' },
+    { name: 'sis.approve', resource: 'sis', action: 'approve', description: 'Утверждение поверки' }
+  ]
+  for (const perm of permissionsToCreate) {
+    const existing = await query(`SELECT id FROM permissions WHERE name = $1`, [perm.name])
+    if (existing.rows.length === 0) {
+      await query(
+        `INSERT INTO permissions (name, resource, action, description) VALUES ($1, $2, $3, $4)`,
+        [perm.name, perm.resource, perm.action, perm.description]
+      )
+      console.log(`✅ Permission created: ${perm.name}`)
+    } else {
+      console.log(`ℹ️ Permission already exists: ${perm.name}`)
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 5. Назначение прав ролям (только если ещё не назначены)
+  // ------------------------------------------------------------
+  // superadmin – все разрешения
+  const superadminRole = await query(`SELECT id FROM roles WHERE name = 'superadmin'`)
+  if (superadminRole.rows.length > 0) {
+    const allPerms = await query(`SELECT id FROM permissions`)
+    for (const perm of allPerms.rows) {
+      await query(
+        `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [superadminRole.rows[0].id, perm.id]
+      )
+    }
+    console.log(`✅ All permissions assigned to superadmin`)
+  }
+
+  // admin – ограниченный набор прав (без удаления и утверждения)
+  const adminRole = await query(`SELECT id FROM roles WHERE name = 'admin'`)
+  if (adminRole.rows.length > 0) {
+    const adminPerms = await query(`SELECT id FROM permissions WHERE name IN ('users.view','users.create','users.edit','sis.view','sis.create','sis.edit')`)
+    for (const perm of adminPerms.rows) {
+      await query(
+        `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [adminRole.rows[0].id, perm.id]
+      )
+    }
+    console.log(`✅ Admin permissions assigned`)
+  }
+
+  // user – только просмотр СИС
+  const userRole = await query(`SELECT id FROM roles WHERE name = 'user'`)
+  if (userRole.rows.length > 0) {
+    const userPerms = await query(`SELECT id FROM permissions WHERE name IN ('sis.view')`)
+    for (const perm of userPerms.rows) {
+      await query(
+        `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [userRole.rows[0].id, perm.id]
+      )
+    }
+    console.log(`✅ User permissions assigned`)
+  }
+
+  // ------------------------------------------------------------
+  // 6. Назначаем пользователю root роль superadmin
+  // ------------------------------------------------------------
+  const rootUser = await query(`SELECT id FROM users WHERE email = 'root'`)
+  if (rootUser.rows.length > 0) {
+    const superadminRoleForRoot = await query(`SELECT id FROM roles WHERE name = 'superadmin'`)
+    if (superadminRoleForRoot.rows.length > 0) {
+      await query(
+        `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [rootUser.rows[0].id, superadminRoleForRoot.rows[0].id]
+      )
+      console.log(`✅ Root user assigned to superadmin role`)
+    }
+  }
+
+  console.log('🎉 All migrations completed successfully')
 }
 
 
@@ -1315,17 +1924,17 @@ export async function runMigrations() {
 ФАЙЛ: server\utils\taskStore.ts
 ========================================
 
-import EventEmitter from 'node:events';
+import EventEmitter from 'node:events'
 
 export interface TaskResult {
-  jobId: string;
-  status: 'pending' | 'completed' | 'failed';
-  data?: any;
-  error?: string;
+  jobId: string
+  status: 'pending' | 'completed' | 'failed'
+  data?: any
+  error?: string
 }
 
-const tasks = new Map<string, TaskResult>();
-export const taskEmitter = new EventEmitter();
+const tasks = new Map<string, TaskResult>()
+export const taskEmitter = new EventEmitter()
 
 export function setTaskResult(jobId: string, data?: any, error?: string) {
   const task: TaskResult = {
@@ -1333,13 +1942,13 @@ export function setTaskResult(jobId: string, data?: any, error?: string) {
     status: error ? 'failed' : 'completed',
     data,
     error,
-  };
-  tasks.set(jobId, task);
-  taskEmitter.emit(`task:${jobId}`, task);
+  }
+  tasks.set(jobId, task)
+  taskEmitter.emit(`task:${jobId}`, task)
 }
 
 export function getTaskResult(jobId: string): TaskResult | undefined {
-  return tasks.get(jobId);
+  return tasks.get(jobId)
 }
 
 
@@ -1353,7 +1962,7 @@ export function getTaskResult(jobId: string): TaskResult | undefined {
 ФАЙЛ: nuxt.config.ts
 ========================================
 
-import { Theme } from './primevue.theme';
+import { Theme } from './primevue.theme'
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -1388,7 +1997,7 @@ export default defineNuxtConfig({
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev -o",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -1414,7 +2023,9 @@ export default defineNuxtConfig({
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
-    "sass": "1.97.3"
+    "sass": "1.97.3",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.2.7"
   }
 }
 
@@ -1488,5 +2099,5 @@ export const Theme = definePreset(Aura, {
 
 
 ==================================================
-Отчет сгенерирован: 29.04.2026, 07:56:58
+Отчет сгенерирован: 30.04.2026, 15:26:27
 Время генерации: 0.02 сек.

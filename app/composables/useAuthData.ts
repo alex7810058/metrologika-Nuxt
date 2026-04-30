@@ -1,4 +1,4 @@
-import type { User } from '~/types'
+import type { User, Role } from '~/types'
 
 /**
  * Композабл для загрузки всех необходимых данных после авторизации
@@ -9,15 +9,14 @@ export function useAuthData() {
 
   /**
    * Загружает все необходимые данные для авторизованного пользователя
-   * @param options Опции загрузки
-   * @param options.users - загрузить список пользователей (по умолчанию true)
    */
-  async function loadAuthData(options: { users?: boolean } = {}) {
-    const { users = true } = options
-
+  async function loadAuthData() {
     try {
       await Promise.all([
-        users ? $fetch<User[]>('/api/users').then(users => cacheStore.setUsers(users)) : Promise.resolve()
+        // @ts-ignore
+        $fetch('/api/users/get', { method: 'POST' }).then((data: User[]) => cacheStore.setUsers(data)),
+        // @ts-ignore
+        $fetch('/api/roles/get', { method: 'POST' }).then((data: Role[]) => cacheStore.setRoles(data)),
       ])
     }
     catch (error) {
