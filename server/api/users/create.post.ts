@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const {email, name, password, role_id} = body
 
-  if (!email || !name || !password) {
+  if (!email || !name || !password || !role_id) {
     setResponseStatus(event, 400)
     return {
       success: false,
@@ -28,21 +28,9 @@ export default defineEventHandler(async (event) => {
     )
     const newUser = insertResult.rows[0]
 
-    // Назначаем роль (по умолчанию 'user', если не указана)
-    let targetRoleId = role_id
-    if (!targetRoleId) {
-      const defaultRole = await query(`
-          SELECT id
-          FROM roles
-          WHERE name = 'user'
-      `)
-      if (defaultRole.rows.length) targetRoleId = defaultRole.rows[0].id
-      else throw new Error('Default role not found')
-    }
-
     await query(
       'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
-      [newUser.id, targetRoleId]
+      [newUser.id, role_id]
     )
 
     await query('COMMIT')
@@ -56,7 +44,7 @@ export default defineEventHandler(async (event) => {
       success: true,
       user: {
         ...user,
-        role_id: targetRoleId
+        role_id
       }
     }
   }

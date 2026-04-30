@@ -39,14 +39,16 @@
 │   └── 📄 robots.txt
 ├── 📁 server
 │   ├── 📁 api
+│   │   ├── 📁 roles
+│   │   │   └── 📄 get.post.ts
 │   │   ├── 📁 sse
 │   │   │   └── 📄 status.get.ts
-│   │   ├── 📄 login.post.ts
-│   │   ├── 📄 logout.post.ts
-│   │   ├── 📄 long-task.post.ts
-│   │   ├── 📄 roles.get.ts
-│   │   ├── 📄 user.post.ts
-│   │   └── 📄 users.get.ts
+│   │   ├── 📁 users
+│   │   │   ├── 📄 create.post.ts
+│   │   │   ├── 📄 get.post.ts
+│   │   │   ├── 📄 login.post.ts
+│   │   │   └── 📄 logout.post.ts
+│   │   └── 📄 long-task.post.ts
 │   ├── 📁 plugins
 │   │   └── 📄 migrations.ts
 │   └── 📁 utils
@@ -60,7 +62,7 @@
 └── 📄 tsconfig.json
 
 ==================================================
-📊 Статистика: 17 папок, 40 файлов
+📊 Статистика: 19 папок, 40 файлов
 
 📄 СОДЕРЖИМОЕ ФАЙЛОВ:
 ==================================================
@@ -101,10 +103,18 @@
           <label for="email">Email</label>
         </FloatLabel>
       </div>
+      <template v-if="appStore.userDialog.method === 'create'">
+        <div class="form-item">
+          <FloatLabel variant="on">
+            <InputText id="password" v-model="appStore.userDialog.data.password" autocomplete="off" />
+            <label for="password">Пароль</label>
+          </FloatLabel>
+        </div>
+      </template>
       <div class="form-item">
         <FloatLabel variant="on">
-          <InputText id="password" v-model="appStore.userDialog.data.name" autocomplete="off" />
-          <label for="password">Имя</label>
+          <InputText id="name" v-model="appStore.userDialog.data.name" autocomplete="off" />
+          <label for="name">Имя</label>
         </FloatLabel>
       </div>
       <div class="form-item">
@@ -133,9 +143,26 @@
 const appStore = useAppStore()
 const cacheStore = useCacheStore()
 const userForm = ref<HTMLFormElement | null>(null)
+const isLoading = ref(false)
 
-const submit = () => {
-  console.log(1111)
+const submit = async () => {
+  // блокируем повторные вызовы
+  if (isLoading.value) return
+  isLoading.value = true
+  try {
+    const result = await $fetch('/api/users/create', {
+      method: 'POST',
+      body: {
+        email: appStore.userDialog.data.email,
+        password: appStore.userDialog.data.password,
+        name: appStore.userDialog.data.name
+      }
+    })
+    console.log(result)
+  }
+  finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -251,8 +278,10 @@ export function useAuthData() {
   async function loadAuthData() {
     try {
       await Promise.all([
-        $fetch('/api/users').then((data: User[]) => cacheStore.setUsers(data)),
-        $fetch('/api/roles').then((data: Role[]) => cacheStore.setRoles(data)),
+        // @ts-ignore
+        $fetch('/api/users/get', { method: 'POST' }).then((data: User[]) => cacheStore.setUsers(data)),
+        // @ts-ignore
+        $fetch('/api/roles/get', { method: 'POST' }).then((data: Role[]) => cacheStore.setRoles(data)),
       ])
     }
     catch (error) {
@@ -499,7 +528,7 @@ async function login() {
 
   try {
     // Отправляем запрос логина
-    const result = await $fetch('/api/login', {
+    const result = await $fetch('/api/users/login', {
       method: 'POST',
       body: {
         email: formData.value.email,
@@ -987,7 +1016,7 @@ input, .p-select {
 }
 
 .text-small {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
 }
 
@@ -1398,6 +1427,28 @@ Disallow:
 
 
 ========================================
+ФАЙЛ: server\api\roles\get.post.ts
+========================================
+
+// server/api/users.get.ts
+import { query } from '../../utils/db'
+
+export default defineEventHandler(async (event) => {
+  // Защита: только авторизованные пользователи
+  await requireUserSession(event)
+
+  try {
+    const result = await query('SELECT * FROM roles ORDER BY id')
+    return result.rows
+  }
+  catch (error) {
+    console.error(error)
+    throw createError({statusCode: 500, message: 'Database error'})
+  }
+})
+
+
+========================================
 ФАЙЛ: server\api\sse\status.get.ts
 ========================================
 
@@ -1449,51 +1500,182 @@ export default defineEventHandler(async (event) => {
 
 
 ========================================
-ФАЙЛ: server\api\login.post.ts
+ФАЙЛ: server\api\users\create.post.ts
 ========================================
 
-import { query } from '../utils/db'
+import { query } from '../../utils/db'
 import bcrypt from 'bcrypt'
 
 export default defineEventHandler(async (event) => {
+  await requireUserSession(event)
+
   const body = await readBody(event)
-  const {email, password, remember} = body
+  const {email, name, password, role_id} = body
 
-  // Ищем пользователя в БД
-  const result = await query('SELECT * FROM users WHERE email = $1', [email])
-  const user = result.rows[0]
-
-  if (!user) {
-    return {error: true, message: 'Invalid credentials'}
+  if (!email || !name || !password) {
+    setResponseStatus(event, 400)
+    return {
+      success: false,
+      message: 'Missing fields: email, name, password'
+    }
   }
 
-  // Проверка пароля (предполагаем, что хранится хеш)
-  const isValid = await bcrypt.compare(password, user.password)
-  if (!isValid) {
-    return {success: false, message: 'Invalid credentials'}
+  const saltRounds = 10
+  const password_hash = await bcrypt.hash(password, saltRounds)
+
+  try {
+    // Начинаем транзакцию
+    await query('BEGIN')
+
+    const insertResult = await query(
+      'INSERT INTO users (email, name, password) VALUES ($1, $2, $3) RETURNING id, email, name',
+      [email, name, password_hash]
+    )
+    const newUser = insertResult.rows[0]
+
+    // Назначаем роль (по умолчанию 'user', если не указана)
+    let targetRoleId = role_id
+    if (!targetRoleId) {
+      const defaultRole = await query(`
+          SELECT id
+          FROM roles
+          WHERE name = 'user'
+      `)
+      if (defaultRole.rows.length) targetRoleId = defaultRole.rows[0].id
+      else throw new Error('Default role not found')
+    }
+
+    await query(
+      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
+      [newUser.id, targetRoleId]
+    )
+
+    await query('COMMIT')
+
+    const result = await query(`SELECT * FROM users WHERE id = ${newUser.id}`)
+    const user = result.rows[0]
+    delete user.password
+
+    // Возвращаем пользователя с role_id
+    return {
+      success: true,
+      user: {
+        ...user,
+        role_id: targetRoleId
+      }
+    }
   }
-
-  // Устанавливаем сессию с учетом флага "Запомнить меня"
-  // Если remember=true, сессия будет жить 30 дней, иначе - до закрытия браузера
-  const maxAge = remember ? 60 * 60 * 24 * 30 : undefined // 30 дней в секундах
-
-  await setUserSession(event, {
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name
-    },
-    loggedInAt: Date.now()
-  }, {
-    maxAge
-  })
-
-  return {success: true}
+  catch (error: any) {
+    await query('ROLLBACK')
+    if (error.code === '23505') {
+      setResponseStatus(event, 409)
+      return {
+        success: false,
+        message: 'User with this email already exists'
+      }
+    }
+    console.error(error)
+    setResponseStatus(event, 500)
+    return {
+      success: false,
+      message: 'Internal server error'
+    }
+  }
 })
 
 
 ========================================
-ФАЙЛ: server\api\logout.post.ts
+ФАЙЛ: server\api\users\get.post.ts
+========================================
+
+import { query } from '../../utils/db'
+
+export default defineEventHandler(async (event) => {
+  await requireUserSession(event)
+
+  try {
+    const result = await query(`
+        SELECT
+            u.id, u.email, u.email_verified_at, u.name, u.created_at, u.updated_at, u.active,
+            ur.role_id
+        FROM users u
+                 LEFT JOIN (
+            SELECT DISTINCT ON (user_id) user_id, role_id
+            FROM user_roles
+        ) ur ON u.id = ur.user_id
+        ORDER BY u.id
+    `)
+    return result.rows
+  } catch (error) {
+    console.error(error)
+    throw createError({ statusCode: 500, message: 'Database error' })
+  }
+})
+
+
+========================================
+ФАЙЛ: server\api\users\login.post.ts
+========================================
+
+import { query } from '../../utils/db'
+import bcrypt from 'bcrypt'
+
+export default defineEventHandler(async (event) => {
+  const body = await readBody(event)
+  const { email, password, remember } = body
+
+  const result = await query('SELECT * FROM users WHERE email = $1', [email])
+  const user = result.rows[0]
+
+  if (!user) {
+    return {
+      success: false,
+      message: 'Invalid credentials'
+    }
+  }
+
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) {
+    return {
+      success: false,
+      message: 'Invalid credentials'
+    }
+  }
+
+  // Получаем role_id пользователя
+  const roleResult = await query(
+    `SELECT role_id FROM user_roles WHERE user_id = $1 LIMIT 1`,
+    [user.id]
+  )
+  const role_id = roleResult.rows[0]?.role_id || null
+
+  const maxAge = remember ? 60 * 60 * 24 * 30 : undefined
+
+  const _user = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    email_verified_at: user.email_verified_at,
+    created_at: user.created_at,
+    updated_at: user.updated_at,
+    active: user.active,
+    role_id: role_id
+  }
+
+  await setUserSession(event, {
+    user: _user,
+    loggedInAt: Date.now()
+  }, { maxAge })
+
+  return {
+    success: true,
+    user: _user
+  }
+})
+
+
+========================================
+ФАЙЛ: server\api\users\logout.post.ts
 ========================================
 
 export default defineEventHandler(async (event) => {
@@ -1541,121 +1723,6 @@ export default defineEventHandler(async (event) => {
 
 
 ========================================
-ФАЙЛ: server\api\roles.get.ts
-========================================
-
-// server/api/users.get.ts
-import { query } from '../utils/db'
-
-export default defineEventHandler(async (event) => {
-  // Защита: только авторизованные пользователи
-  await requireUserSession(event)
-
-  try {
-    const result = await query('SELECT * FROM roles ORDER BY id')
-    return result.rows
-  }
-  catch (error) {
-    console.error(error)
-    throw createError({statusCode: 500, message: 'Database error'})
-  }
-})
-
-
-========================================
-ФАЙЛ: server\api\user.post.ts
-========================================
-
-import { query } from '../utils/db'
-import bcrypt from 'bcrypt'
-
-export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
-
-  const body = await readBody(event)
-  const { email, name, password, role_id } = body
-
-  if (!email || !name || !password) {
-    setResponseStatus(event, 400)
-    return { error: true, message: 'Missing fields: email, name, password' }
-  }
-
-  const saltRounds = 10
-  const password_hash = await bcrypt.hash(password, saltRounds)
-
-  try {
-    // Начинаем транзакцию
-    await query('BEGIN')
-
-    const insertResult = await query(
-      'INSERT INTO users (email, name, password) VALUES ($1, $2, $3) RETURNING id, email, name',
-      [email, name, password_hash]
-    )
-    const newUser = insertResult.rows[0]
-
-    // Назначаем роль (по умолчанию 'user', если не указана)
-    let targetRoleId = role_id
-    if (!targetRoleId) {
-      const defaultRole = await query(`SELECT id FROM roles WHERE name = 'user'`)
-      if (defaultRole.rows.length) targetRoleId = defaultRole.rows[0].id
-      else throw new Error('Default role not found')
-    }
-
-    await query(
-      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
-      [newUser.id, targetRoleId]
-    )
-
-    await query('COMMIT')
-
-    // Возвращаем пользователя с role_id
-    return {
-      ...newUser,
-      role_id: targetRoleId
-    }
-  } catch (error: any) {
-    await query('ROLLBACK')
-    if (error.code === '23505') {
-      setResponseStatus(event, 409)
-      return { error: true, message: 'User with this email already exists' }
-    }
-    console.error(error)
-    setResponseStatus(event, 500)
-    return { error: true, message: 'Internal server error' }
-  }
-})
-
-
-========================================
-ФАЙЛ: server\api\users.get.ts
-========================================
-
-import { query } from '../utils/db'
-
-export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
-
-  try {
-    const result = await query(`
-        SELECT
-            u.id, u.email, u.email_verified_at, u.name, u.created_at, u.updated_at, u.active,
-            ur.role_id
-        FROM users u
-                 LEFT JOIN (
-            SELECT DISTINCT ON (user_id) user_id, role_id
-            FROM user_roles
-        ) ur ON u.id = ur.user_id
-        ORDER BY u.id
-    `)
-    return result.rows
-  } catch (error) {
-    console.error(error)
-    throw createError({ statusCode: 500, message: 'Database error' })
-  }
-})
-
-
-========================================
 ФАЙЛ: server\plugins\migrations.ts
 ========================================
 
@@ -1671,7 +1738,7 @@ export default defineNitroPlugin(async (nitroApp) => {
 ФАЙЛ: server\utils\db.ts
 ========================================
 
-import { Pool, types } from 'pg'
+import { Pool, types, QueryResult } from 'pg'
 
 // Парсим BIGINT (int8) как число (ОСТОРОЖНО: может потерять точность при ID > 2^53)
 types.setTypeParser(types.builtins.INT8, (val: string) => parseInt(val, 10))
@@ -1705,7 +1772,7 @@ pool.on('error', (err) => {
   process.exit(-1)
 })
 
-export const query = (text: string, params?: any[]) => pool.query(text, params)
+export const query = (text: string, params?: any[]): Promise<QueryResult> => pool.query(text, params)
 export const closeDb = () => pool.end()
 
 
@@ -2099,5 +2166,5 @@ export const Theme = definePreset(Aura, {
 
 
 ==================================================
-Отчет сгенерирован: 30.04.2026, 15:26:27
+Отчет сгенерирован: 30.04.2026, 17:03:31
 Время генерации: 0.02 сек.

@@ -19,7 +19,7 @@
         <Column field="name" header="Имя" />
         <Column header="Роль">
           <template #body="{ data }">
-            {{ cacheStore.rolesById[data.id]?.ru_name }}
+            {{ cacheStore.rolesById[data.role_id]?.ru_name }}
           </template>
         </Column>
         <Column field="email" header="Email" />
